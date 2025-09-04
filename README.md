@@ -33,13 +33,12 @@ This project is an AI-powered personalized trip planner for India, leveraging Go
 ## Project Structure
 - `main.py`: Entry point for the backend server
 - `requirements.txt`: Python dependencies
-- `.github/copilot-instructions.md`: Workspace instructions
 
 ## Next Steps
 - Implement itinerary generation logic
 - Integrate Google APIs
 - Build booking and payment modules
-- Develop frontend (optional)
 
 ---
 Replace placeholder code and credentials with your own for production use.
+
