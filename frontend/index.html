@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Trip Planner</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            margin: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 3em auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 2em 2.5em;
+        }
+        h1 {
+            text-align: center;
+            color: #2d6cdf;
+            margin-bottom: 1.5em;
+        }
+        label {
+            font-weight: 500;
+            margin-bottom: 0.5em;
+        }
+        input, select, textarea {
+            display: block;
+            margin-bottom: 1.2em;
+            width: 100%;
+            padding: 0.6em;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            font-size: 1em;
+        }
+        button {
+            padding: 0.7em 1.5em;
+            border: none;
+            border-radius: 6px;
+            background: #2d6cdf;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            margin-right: 0.5em;
+            margin-top: 0.5em;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #1b4fa0;
+        }
+        .result {
+            background: #f4f8fb;
+            padding: 1.5em;
+            margin-top: 2em;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .section {
+            margin-bottom: 1.5em;
+        }
+        .section h2 {
+            color: #2d6cdf;
+            margin-bottom: 0.5em;
+        }
+        .share-link {
+            display: inline-block;
+            margin-top: 0.5em;
+            color: #1b4fa0;
+            text-decoration: underline;
+        }
+        #actionResult h3 {
+            color: #1b4fa0;
+            margin-top: 1em;
+        }
+        #adjustInput {
+            margin-top: 0.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Trip Planner</h1>
+        <form id="tripForm">
+            <label>Location: <input type="text" name="location" required></label>
+            <label>Budget: <input type="number" name="budget" required></label>
+            <label>Duration (days): <input type="number" name="duration" required></label>
+            <label>Interests: <input type="text" name="interests" placeholder="heritage, adventure, nightlife"></label>
+            <label>Language: <select name="language">
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="ta">Tamil</option>
+                <option value="bn">Bengali</option>
+            </select></label>
+            <button type="submit">Get Itinerary</button>
+        </form>
+        <div class="result" id="result" style="display:none;"></div>
+    </div>
+    <script>
+        document.getElementById('tripForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                location: form.location.value,
+                budget: Number(form.budget.value),
+                duration: Number(form.duration.value),
+                interests: form.interests.value.split(',').map(i => i.trim()),
+                language: form.language.value
+            };
+            const res = await fetch('http://127.0.0.1:5000/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const itinerary = await res.json();
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerHTML = `
+                <div class="section">
+                    <h2>Itinerary</h2>
+                    <pre id="itineraryJson">${JSON.stringify(itinerary, null, 2)}</pre>
+                </div>
+                <div class="section">
+                    <a class="share-link" href="${itinerary.shareable_link}" target="_blank">Shareable Link</a>
+                </div>
+                <div class="section">
+                    <button id="bookBtn">Book This Trip</button>
+                    <button id="adjustBtn">Request Adjustment</button>
+                    <input id="adjustInput" type="text" placeholder="e.g. Add a day for shopping">
+                </div>
+                <div id="actionResult"></div>
+            `;
+
+            document.getElementById('bookBtn').onclick = async function() {
+                const payment_info = { method: 'mock', details: 'N/A' };
+                const res = await fetch('http://127.0.0.1:5000/book', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itinerary, payment_info })
+                });
+                const result = await res.json();
+                document.getElementById('actionResult').innerHTML = `<h3>Booking Result</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+            };
+
+            document.getElementById('adjustBtn').onclick = async function() {
+                const change_request = document.getElementById('adjustInput').value;
+                if (!change_request) return;
+                const res = await fetch('http://127.0.0.1:5000/adjust', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itinerary, change_request })
+                });
+                const result = await res.json();
+                document.getElementById('itineraryJson').textContent = JSON.stringify(result, null, 2);
+                document.getElementById('actionResult').innerHTML = `<h3>Adjustment Result</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
+            };
+        };
+    </script>
+</body>
+</html>

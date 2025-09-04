@@ -1,0 +1,5 @@
+flask
+google-cloud-vertex-ai
+googlemaps
+firebase-admin
+google-cloud-bigquery
