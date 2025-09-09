@@ -1,55 +1,96 @@
+AI Trip Planner
+An AI-powered personalized trip planner for India, leveraging Google's Gemini model through Vertex AI. This application creates detailed, day-by-day travel itineraries based on user-specified requirements including origin, destination, dates, budget, interests, and more.
 
-# AI Trip Planner
+This project is a multi-page Flask web application, featuring a user input form, a dynamic itinerary display page, and an interactive regeneration feature.
 
-An AI-powered personalized trip planner for India, leveraging Google Vertex AI, Gemini, Maps API, Firebase, and BigQuery. It dynamically creates end-to-end itineraries tailored to individual budgets, interests, and real-time conditions, with seamless booking and payment capabilities.
+Current Features
+Detailed User Input: Collects trip origin, destination, dates, budget, multiple interests, preferred transport, and additional notes.
 
-## Features
-- Dynamic itinerary generation (budget, duration, interests)
-- Aggregates data from maps, events, local guides
-- Multilingual, interactive interface (language selection)
-- Real-time smart adjustments (weather, delays, last-minute bookings)
-- Shareable, optimized itinerary with cost breakdown
-- One-click booking and payment
-- Modern, user-friendly frontend UI
+AI-Powered Itinerary Generation: Uses a detailed prompt to instruct the Gemini 1.5 Flash model to generate a structured JSON response containing a day-by-day plan and cost breakdown.
 
-## Tech Stack
-- Python 3.13+
-- Flask (backend API)
-- Google Vertex AI, Gemini
-- Google Maps API
-- Firebase
-- BigQuery
-- HTML/CSS/JavaScript (frontend)
+Multi-Page Interface:
 
-## Backend Endpoints
-- `POST /plan`: Generate itinerary based on user preferences (budget, duration, interests, location, language). Returns itinerary, cost breakdown, and shareable link.
-- `POST /book`: Book the generated itinerary (mock integration, returns confirmation).
-- `POST /adjust`: Request real-time itinerary adjustments (mock integration, returns updated itinerary).
+A clean input form on the main page (/).
 
-## Frontend
-- Located in `frontend/index.html`
-- Modern UI for entering trip details, viewing itinerary, booking, and requesting adjustments
+A dedicated results page (/itinerary) to display the generated plan.
 
-## Getting Started
-1. Ensure Python 3.13+ is installed.
-2. Set up Google Cloud APIs and credentials (Vertex AI, Maps, etc.).
-3. Install dependencies:
-   ```sh
-   pip install flask google-cloud-vertex-ai googlemaps firebase-admin google-cloud-bigquery
-   ```
-4. Run the backend server:
-   ```sh
-   python main.py
-   ```
-5. Open `frontend/index.html` in your browser.
+Interactive Regeneration: Users can provide feedback or request changes on the itinerary page, which triggers the AI to generate a revised plan.
 
-## Project Structure
-- `main.py`: Backend server and API endpoints
-- `requirements.txt`: Python dependencies
-- `frontend/index.html`: Web interface for trip planning
+Multilingual Support: Capable of generating itineraries in multiple Indian languages.
 
-## Notes
-- Replace placeholder API keys and credentials with your own for production use.
-- The booking and adjustment features are currently mock implementations.
+User Feedback: Provides a loading message during itinerary generation and helpful error messages for invalid input.
 
----
+Tech Stack
+Backend: Python 3.11+ with Flask
+
+AI Model: Google Gemini 1.5 Flash via Vertex AI
+
+Frontend: HTML5, CSS3, JavaScript
+
+Deployment (Planned): Google Cloud Run with Gunicorn
+
+Project Structure
+The project is organized as a standard Flask application:
+
+.
+├── app.py              # The main Flask application, contains all backend logic and routes.
+├── requirements.txt      # A list of all necessary Python packages.
+├── Dockerfile            # Instructions to containerize the app for deployment.
+└── templates/
+    ├── index.html      # The main page with the user input form.
+    └── itinerary.html  # The page that displays the generated itinerary.
+
+Getting Started (Local Development)
+Follow these steps to run the application on your local machine.
+
+1. Prerequisites
+Python (3.10+ recommended)
+
+An active Google Cloud Project with billing enabled.
+
+The Google Cloud CLI installed and authenticated.
+
+2. Initial Setup
+Clone the repository and navigate into the project directory.
+
+Create and activate a Python virtual environment:
+
+# Create the environment
+python -m venv venv
+
+# Activate on Windows (PowerShell)
+.\venv\Scripts\activate
+
+# Activate on macOS/Linux
+source venv/bin/activate
+
+Install the required Python packages:
+
+pip install -r requirements.txt
+
+3. Configure Google Cloud
+Enable the necessary APIs in your project:
+
+Vertex AI API
+
+Authenticate your local machine for Application Default Credentials (ADC):
+
+gcloud auth application-default login
+
+This will open a browser window for you to log in and grant permissions.
+
+4. Set Environment Variables
+You must set the following environment variables in your terminal before running the app.
+
+On Windows (PowerShell):
+
+$env:GOOGLE_PROJECT_ID = "your-gcp-project-id"
+
+On macOS/Linux:
+
+export GOOGLE_PROJECT_ID="your-gcp-project-id"
+
+5. Run the Application
+With your virtual environment active and environment variables set, start the Flask server:
+
+flask run

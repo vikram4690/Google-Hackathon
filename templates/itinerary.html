@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Personalized Itinerary</title>
+    <style>
+        /* This CSS is copied from index.html for consistent styling */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            margin: 0;
+            padding: 1em;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2em auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            padding: 2em 2.5em;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+            color: #2d6cdf;
+        }
+
+        .day-plan {
+            background: #f4f8fb;
+            padding: 1.5em;
+            margin-bottom: 1.5em;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .day-plan h3 {
+            color: #1b4fa0;
+            margin-top: 0;
+            border-bottom: 2px solid #dde6f1;
+            padding-bottom: 0.5em;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        li {
+            margin-bottom: 1em;
+        }
+
+        li strong {
+            color: #2d6cdf;
+        }
+
+        .actions {
+            text-align: center;
+            margin-top: 2em;
+        }
+
+        button {
+            padding: 0.8em 1.5em;
+            border: none;
+            border-radius: 8px;
+            background: #2d6cdf;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #1b4fa0;
+        }
+
+        .flash-error {
+            background-color: #ffebe9;
+            color: #d82c0d;
+            padding: 1em;
+            border-radius: 8px;
+            margin-bottom: 1.5em;
+            border: 1px solid #ffc1b8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- The 'itinerary_data' variable comes from the app.py render_template call -->
+        <h1>Your Trip to {{ itinerary_data.request.destination }}</h1>
+
+        <!-- This block will display flashed messages from the server -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- This checks if the itinerary data exists before trying to display it -->
+        {% if itinerary_data %}
+        <!-- Loop through each day in the plan -->
+        {% for day in itinerary_data.itinerary.plan %}
+        <div class="day-plan">
+            <h3>Day {{ day.day }}: {{ day.theme }} ({{ day.date }})</h3>
+            <ul>
+                <!-- Loop through each activity in the day -->
+                {% for activity in day.activities %}
+                <li>
+                    <strong>{{ activity.time }}:</strong> {{ activity.description }}
+                    <em>({{ activity.location_name }})</em>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+
+        <!-- Display cost breakdown -->
+        <div class="day-plan">
+            <h3>Estimated Cost Breakdown</h3>
+            {% set costs = itinerary_data.itinerary.cost_breakdown %}
+            <ul>
+                <li><strong>Accommodation:</strong> ₹{{ costs.accommodation_estimate_inr | int }}</li>
+                <li><strong>Transport:</strong> ₹{{ costs.transport_estimate_inr | int }}</li>
+                <li><strong>Activities:</strong> ₹{{ costs.activities_estimate_inr | int }}</li>
+                <li><strong>Food:</strong> ₹{{ costs.food_estimate_inr | int }}</li>
+                <hr>
+                <li><strong>Total Estimated Cost:</strong> ₹{{ costs.total_estimate_inr | int }}</li>
+            </ul>
+        </div>
+
+        <!-- Regeneration Section -->
+        <div class="day-plan">
+            <h3>Need Changes?</h3>
+            <p>Enter any adjustments you'd like (e.g., "replace the museum on Day 2 with a shopping trip," or "add a
+                famous temple").</p>
+            <form action="{{ url_for('regenerate_itinerary') }}" method="post" id="regenerateForm">
+                <!-- This hidden input is crucial. It sends the original plan back for context. -->
+                <input type="hidden" name="original_itinerary" value='{{ itinerary_data | tojson | safe }}'>
+
+                <textarea name="change_request" rows="4" placeholder="Your requested changes..."
+                    style="width: 100%; font-size: 1em; padding: 0.5em; border-radius: 6px; border: 1px solid #d0d7de; box-sizing: border-box;"></textarea>
+
+                <button type="submit" style="margin-top: 1em;">Regenerate Itinerary</button>
+            </form>
+        </div>
+
+        <div class="actions">
+            <!-- This will eventually link to your /payment route -->
+            <button onclick="window.location.href='{{ url_for('payment') }}'">Proceed to Booking</button>
+        </div>
+
+        {% else %}
+        <h2>Itinerary not found or has expired.</h2>
+        <p><a href="/">Please go back and create a new plan.</a></p>
+        {% endif %}
+    </div>
+    <script>
+        const regenerateForm = document.getElementById('regenerateForm');
+
+        if (regenerateForm) {
+            const regenerateBtn = regenerateForm.querySelector('button[type="submit"]');
+
+            regenerateForm.addEventListener('submit', function () {
+                regenerateBtn.disabled = true;
+                regenerateBtn.textContent = 'Regenerating...';
+            });
+        }
+    </script>
+</body>
+
+</html>
