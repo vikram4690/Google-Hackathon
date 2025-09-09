@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Trip Planner</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            margin: 0;
+            padding: 1em;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 2em auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 2em 2.5em;
+        }
+        h1 {
+            text-align: center;
+            color: #2d6cdf;
+            margin-bottom: 1.5em;
+        }
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5em;
+        }
+        input, select {
+            display: block;
+            margin-bottom: 1.2em;
+            width: 100%;
+            padding: 0.6em;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 0.8em 1.5em;
+            border: none;
+            border-radius: 8px;
+            background: #2d6cdf;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            margin-right: 0.5em;
+            margin-top: 0.5em;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #1b4fa0;
+        }
+        button:disabled {
+            background: #9db2d4;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 2em;
+        }
+        .day-plan {
+            background: #f4f8fb;
+            padding: 1.5em;
+            margin-bottom: 1.5em;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .day-plan h3 {
+            color: #1b4fa0;
+            margin-top: 0;
+            border-bottom: 2px solid #dde6f1;
+            padding-bottom: 0.5em;
+        }
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        li {
+            margin-bottom: 1em;
+        }
+        li strong {
+            color: #2d6cdf;
+        }
+        #loading {
+            text-align: center;
+            font-size: 1.2em;
+            color: #1b4fa0;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Trip Planner for India</h1>
+        <form id="tripForm">
+            <label>Location:</label>
+            <input type="text" id="location" name="location" required placeholder="e.g., Mumbai">
+
+            <label>Budget (INR):</label>
+            <input type="number" id="budget" name="budget" required placeholder="e.g., 50000">
+
+            <label>Duration (days):</label>
+            <input type="number" id="duration" name="duration" required placeholder="e.g., 5">
+
+            <label>Interests (comma-separated):</label>
+            <input type="text" id="interests" name="interests" required placeholder="e.g., heritage, adventure, nightlife">
+
+            <label>Language:</label>
+            <select name="language" id="language">
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="ta">Tamil</option>
+                <option value="bn">Bengali</option>
+            </select>
+
+            <button type="submit" id="submitBtn">Get Itinerary</button>
+        </form>
+
+        <div id="loading" style="display:none;">Generating your personalized itinerary...</div>
+        <div class="result" id="resultContainer"></div>
+    </div>
+
+    <script>
+        const tripForm = document.getElementById('tripForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingDiv = document.getElementById('loading');
+        const resultContainer = document.getElementById('resultContainer');
+
+        tripForm.onsubmit = async function(e) {
+            e.preventDefault();
+            
+            // Show loading indicator and disable button
+            loadingDiv.style.display = 'block';
+            submitBtn.disabled = true;
+            resultContainer.innerHTML = '';
+
+            const data = {
+                location: document.getElementById('location').value,
+                budget: Number(document.getElementById('budget').value),
+                duration: Number(document.getElementById('duration').value),
+                interests: document.getElementById('interests').value.split(',').map(i => i.trim()),
+                language: document.getElementById('language').value
+            };
+
+            try {
+                // IMPORTANT: Use relative URL for deployment
+                const res = await fetch('/plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.details || 'Failed to fetch itinerary.');
+                }
+
+                const responseData = await res.json();
+                displayItinerary(responseData.itinerary);
+
+            } catch (error) {
+                resultContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            } finally {
+                // Hide loading indicator and re-enable button
+                loadingDiv.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        };
+
+        function displayItinerary(itinerary) {
+            resultContainer.innerHTML = ''; // Clear previous results
+
+            // Display each day's plan
+            itinerary.plan.forEach(day => {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day-plan';
+
+                let activitiesHtml = '<ul>';
+                day.activities.forEach(activity => {
+                    activitiesHtml += `
+                        <li>
+                            <strong>${activity.time}:</strong> ${activity.description} 
+                            <em>(${activity.location_name})</em>
+                        </li>
+                    `;
+                });
+                activitiesHtml += '</ul>';
+
+                dayDiv.innerHTML = `
+                    <h3>Day ${day.day}: ${day.theme}</h3>
+                    ${activitiesHtml}
+                `;
+                resultContainer.appendChild(dayDiv);
+            });
+
+            // Display cost breakdown
+            const costDiv = document.createElement('div');
+            costDiv.className = 'day-plan';
+            const costs = itinerary.cost_breakdown;
+            costDiv.innerHTML = `
+                <h3>Estimated Cost Breakdown</h3>
+                <ul>
+                    <li><strong>Accommodation:</strong> ₹${costs.accommodation_estimate_inr.toLocaleString('en-IN')}</li>
+                    <li><strong>Transport:</strong> ₹${costs.transport_estimate_inr.toLocaleString('en-IN')}</li>
+                    <li><strong>Activities:</strong> ₹${costs.activities_estimate_inr.toLocaleString('en-IN')}</li>
+                    <li><strong>Food:</strong> ₹${costs.food_estimate_inr.toLocaleString('en-IN')}</li>
+                    <hr>
+                    <li><strong>Total Estimated Cost:</strong> ₹${costs.total_estimate_inr.toLocaleString('en-IN')}</li>
+                </ul>
+            `;
+            resultContainer.appendChild(costDiv);
+        }
+    </script>
+</body>
+</html>

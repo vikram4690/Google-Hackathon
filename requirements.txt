@@ -1,5 +1,7 @@
 flask
-google-cloud-vertex-ai
+flask-cors
+google-cloud-aiplatform
 googlemaps
 firebase-admin
 google-cloud-bigquery
+gunicorn
