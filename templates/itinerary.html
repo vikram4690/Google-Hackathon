@@ -86,6 +86,13 @@
             margin-bottom: 1.5em;
             border: 1px solid #ffc1b8;
         }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 10px;
+            margin-bottom: 2em;
+        }
     </style>
 </head>
 
@@ -93,6 +100,10 @@
     <div class="container">
         <!-- The 'itinerary_data' variable comes from the app.py render_template call -->
         <h1>Your Trip to {{ itinerary_data.request.destination }}</h1>
+
+        <div id="map"
+            style="height: 400px; width: 100%; border-radius: 10px; margin-bottom: 2em; background-color: #eee;"></div>
+        <!-- Map will be rendered here -->
 
         <!-- This block will display flashed messages from the server -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -152,9 +163,18 @@
         </div>
 
         <div class="actions">
-            <!-- This will eventually link to your /payment route -->
-            <button onclick="window.location.href='{{ url_for('payment') }}'">Proceed to Booking</button>
+            <button id="saveTripBtn" style="margin-right: 1em;">
+                💾 Save Trip
+            </button>
+            <button id="bookingBtn" style="padding: 1em 2em; background: linear-gradient(90deg, #28a745 60%, #218838 100%); 
+                color: white; border: none; border-radius: 12px; font-size: 1.1em; font-weight: 600; 
+                cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3); display: none;">
+                💳 Proceed to Booking
+            </button>
         </div>
+
+        <!-- FIX #2: ADDED THE MISSING saveStatus ELEMENT -->
+        <div id="saveStatus" style="text-align: center; margin-top: 1em; color: green; font-weight: bold;"></div>
 
         {% else %}
         <h2>Itinerary not found or has expired.</h2>
@@ -173,6 +193,164 @@
             });
         }
     </script>
+    <script>
+        function initMap() {
+            console.log("🗺️ InitMap called!");
+
+            // FIX #1: PUT THE JINJA EXPRESSION ON A SINGLE LINE
+            const itineraryData = {{ itinerary_data | tojson | safe
+        }};
+
+        console.log("Itinerary data:", itineraryData);
+
+        if (!itineraryData || !itineraryData.itinerary || !itineraryData.itinerary.plan || !itineraryData.itinerary.plan.length) {
+            document.getElementById('map').innerHTML = '<p style="text-align:center; padding-top: 150px; color: #666;">Map data is not available for this itinerary.</p>';
+            return;
+        }
+
+        // Check activities for coordinates
+        let allActivities = [];
+        itineraryData.itinerary.plan.forEach((day, dayIndex) => {
+            console.log(`Day ${dayIndex + 1} activities:`, day.activities);
+            if (day.activities) {
+                day.activities.forEach((activity, actIndex) => {
+                    console.log(`Activity ${actIndex + 1}:`, activity);
+                    console.log(`Has coordinates? lat: ${activity.latitude}, lng: ${activity.longitude}`);
+
+                    // Only add activities that have coordinates
+                    if (activity.latitude && activity.longitude) {
+                        allActivities.push(activity);
+                        console.log(`✅ Added activity: ${activity.location_name}`);
+                    } else {
+                        console.log(`❌ No coordinates for: ${activity.location_name || 'Unknown location'}`);
+                    }
+                });
+            }
+        });
+
+        console.log(`Total activities with coordinates: ${allActivities.length}`);
+
+        if (allActivities.length === 0) {
+            document.getElementById('map').innerHTML = '<p style="text-align:center; padding-top: 150px; color: #666;">No location coordinates found in activities.</p>';
+            return;
+        }
+
+        // Set the map's center to the location of the first activity
+        const mapCenter = {
+            lat: allActivities[0].latitude,
+            lng: allActivities[0].longitude
+        };
+        console.log("Map center:", mapCenter);
+
+        const map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 12,
+            center: mapCenter,
+        });
+
+        console.log("✅ Map created, adding markers...");
+
+        // Create a pin (marker) for each activity
+        allActivities.forEach((activity, index) => {
+            console.log(`Creating marker ${index + 1} for:`, activity.location_name);
+            const marker = new google.maps.Marker({
+                position: { lat: activity.latitude, lng: activity.longitude },
+                map: map,
+                title: activity.location_name,
+                label: (index + 1).toString()
+            });
+            console.log(`✅ Marker ${index + 1} created at:`, marker.getPosition().toString());
+        });
+
+        console.log("🎯 All markers created!");
+        }
+    </script>
+
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+    
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLGw84oAfsi1hovFmFxedo6V_J-luj_Sg",
+            authDomain: "principal-lane-470311-j4.firebaseapp.com",
+            projectId: "principal-lane-470311-j4",
+            storageBucket: "principal-lane-470311-j4.firebasestorage.app",
+            messagingSenderId: "215616135597",
+            appId: "1:215616135597:web:99558a378db116fccdc124",
+        };
+    
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const saveBtn = document.getElementById('saveTripBtn');
+        const saveStatus = document.getElementById('saveStatus');
+    
+        saveBtn.addEventListener('click', async () => {
+            if (!auth.currentUser) {
+                alert('You must be logged in to save a trip.');
+                window.location.href = '/login';
+                return;
+            }
+    
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            saveStatus.textContent = '';
+    
+            try {
+                const idToken = await auth.currentUser.getIdToken(true);
+                
+                // This line is now on a single line to prevent syntax errors
+                const itineraryData = {{ itinerary_data | tojson | safe }};
+    
+                const response = await fetch('/save-trip-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({
+                        source: itineraryData.request.source,
+                        destination: itineraryData.request.destination,
+                        itinerary_content: itineraryData
+                    })
+                });
+    
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to save the trip.');
+                }
+    
+                // --- NEW LOGIC TO ACTIVATE BOOKING BUTTON ---
+                
+                // Get the server's response which includes the new trip_id
+                const saveData = await response.json();
+                const tripId = saveData.data.trip_id; // Extract the ID
+    
+                // Update the UI to show the trip is saved
+                saveBtn.textContent = '✅ Saved!';
+                saveStatus.textContent = 'Trip saved! You can now proceed to booking.';
+    
+                // Find the booking button (which is hidden in the HTML)
+                const bookingBtn = document.getElementById('bookingBtn');
+                bookingBtn.style.display = 'inline-block'; // Make it visible
+    
+                // Set its click action to go to the correct URL with the new tripId
+                bookingBtn.onclick = function() {
+                    window.location.href = `/payment/${tripId}`;
+                };
+                
+                // --- END OF NEW LOGIC ---
+    
+            } catch (error) {
+                console.error('Save trip error:', error);
+                saveStatus.textContent = `Error: ${error.message}`;
+                saveBtn.disabled = false;
+                saveBtn.textContent = '💾 Save Trip';
+            }
+        });
+    </script>
+
+
 </body>
 
 </html>

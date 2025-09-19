@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dashboard - AI Trip Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* This is the complete and correct CSS from your template. */
+        body {
+            font-family: 'Montserrat', Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            margin: 0;
+            padding: 1em;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2em auto;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2em;
+        }
+
+        .sidebar {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(44, 62, 80, 0.13);
+            padding: 2em;
+            height: fit-content;
+            position: sticky;
+            top: 2em;
+        }
+
+        .profile-section {
+            text-align: center;
+            margin-bottom: 2em;
+            padding-bottom: 2em;
+            border-bottom: 1px solid #e0eafc;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #2d6cdf, #1b4fa0);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1em;
+            font-size: 2em;
+            color: white;
+            font-weight: 700;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .nav-item {
+            margin-bottom: 0.5em;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.8em 1em;
+            color: #666;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: all 0.2s;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            background: #f8faff;
+            color: #2d6cdf;
+            transform: translateX(5px);
+        }
+
+        .nav-link .icon {
+            margin-right: 0.8em;
+            font-size: 1.2em;
+        }
+
+        .main-content {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(44, 62, 80, 0.13);
+            padding: 2em;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 1px solid #e0eafc;
+        }
+
+        .dashboard-title {
+            color: #2d6cdf;
+            font-size: 2em;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 1em;
+        }
+
+        .btn {
+            padding: 0.8em 1.5em;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #2d6cdf 60%, #1b4fa0 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(45, 108, 223, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5em;
+            margin-bottom: 2em;
+        }
+
+        .dashboard-card {
+            background: #f8faff;
+            border-radius: 16px;
+            padding: 1.5em;
+            border-left: 4px solid #2d6cdf;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1em;
+        }
+
+        .card-icon {
+            font-size: 2em;
+            margin-right: 0.5em;
+        }
+
+        .card-title {
+            color: #1b4fa0;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #2d6cdf;
+            margin: 0;
+        }
+
+        .trips-section {
+            margin-top: 2em;
+        }
+
+        .section-title {
+            color: #1b4fa0;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 1em;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+
+        .trip-card-link {
+            text-decoration: none;
+        }
+
+        .trip-card {
+            background: #fff;
+            border: 1px solid #e0eafc;
+            border-radius: 16px;
+            padding: 1.5em;
+            margin-bottom: 1em;
+            transition: all 0.2s;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .trip-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(45, 108, 223, 0.1);
+            border-color: #2d6cdf;
+        }
+
+        .trip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1em;
+        }
+
+        .trip-destination {
+            color: #2d6cdf;
+            font-size: 1.3em;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .trip-details p {
+            margin: 0.3em 0;
+        }
+
+        .trip-details small {
+            color: #667;
+            font-weight: 500;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 1em;
+                margin: 1em;
+            }
+
+            .sidebar {
+                position: static;
+                margin-bottom: 1em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                gap: 1em;
+                align-items: stretch;
+            }
+
+            .quick-actions {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="profile-section">
+                <div class="profile-avatar" id="userAvatar">?</div>
+                <h3 id="userName" style="margin: 0; color: #2d6cdf;">Loading...</h3>
+                <p id="userEmail" style="margin: 0.5em 0 0 0; color: #666; font-size: 0.9em;">-</p>
+            </div>
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item"><a class="nav-link active" data-tab="overview"><span
+                                class="icon">📊</span><span>Overview</span></a></li>
+                    <li class="nav-item"><a class="nav-link" data-tab="trips"><span class="icon">✈️</span><span>My
+                                Trips</span></a></li>
+                    <li class="nav-item"><a class="nav-link" data-tab="profile"><span
+                                class="icon">⚙️</span><span>Profile Settings</span></a></li>
+                    <li class="nav-item" style="border-top: 1px solid #e0eafc; margin-top: 1em; padding-top: 1em;"><a
+                            href="/" class="nav-link"><span class="icon">🏠</span><span>Home</span></a></li>
+                </ul>
+            </nav>
+        </div>
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <div class="dashboard-header">
+                <h1 class="dashboard-title">Dashboard</h1>
+                <div class="quick-actions"><a href="/" class="btn btn-primary"><span>✨</span><span>Plan New
+                            Trip</span></a></div>
+            </div>
+            <!-- Tab Content -->
+            <div id="overview-tab" class="tab-content">
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-header"><span class="card-icon">✈️</span>
+                            <h3 class="card-title">Total Trips</h3>
+                        </div>
+                        <p class="card-value" id="totalTrips">0</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-header"><span class="card-icon">📋</span>
+                            <h3 class="card-title">Booked Trips</h3>
+                        </div>
+                        <p class="card-value" id="bookedTrips">0</p>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-header"><span class="card-icon">💰</span>
+                            <h3 class="card-title">Total Spent</h3>
+                        </div>
+                        <p class="card-value">₹0</p>
+                    </div>
+                </div>
+            </div>
+            <div id="trips-tab" class="tab-content" style="display: none;">
+                <h2 class="section-title"><span>✈️</span><span>All My Trips</span></h2>
+                <div id="allTripsContainer"></div>
+            </div>
+            <div id="profile-tab" class="tab-content" style="display: none;">
+                <h2 class="section-title"><span>⚙️</span><span>Profile Settings</span></h2>
+
+                <form id="profileForm">
+                    <div style="margin-bottom: 1.5em;">
+                        <label for="profileEmailInput"
+                            style="font-weight: 600; display: block; margin-bottom: 0.5em;">Email Address</label>
+                        <input type="email" id="profileEmailInput" disabled
+                            style="width: 100%; padding: 0.8em; border-radius: 8px; border: 1px solid #d0d7de; background: #f0f2f5; cursor: not-allowed; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 1.5em;">
+                        <label for="profileNameInput"
+                            style="font-weight: 600; display: block; margin-bottom: 0.5em;">Display Name</label>
+                        <input type="text" id="profileNameInput" placeholder="Your full name"
+                            style="width: 100%; padding: 0.8em; border-radius: 8px; border: 1px solid #d0d7de; box-sizing: border-box;">
+                    </div>
+
+                    <button type="submit" id="saveProfileBtn" class="btn btn-primary">Save Changes</button>
+                </form>
+
+                <div id="profileMessage" style="margin-top: 1em; font-weight: 600;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+
+        // PASTE YOUR FIREBASE CONFIG OBJECT HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLGw84oAfsi1hovFmFxedo6V_J-luj_Sg",
+            authDomain: "principal-lane-470311-j4.firebaseapp.com",
+            projectId: "principal-lane-470311-j4",
+            storageBucket: "principal-lane-470311-j4.firebasestorage.app",
+            messagingSenderId: "215616135597",
+            appId: "1:215616135597:web:99558a378db116fccdc124",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // --- Main Functionality ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                populateUserInfo(user);
+                await loadDashboardData(user);
+                setupTabNavigation();
+                setupProfileTab(user);
+            }
+        });
+
+        function populateUserInfo(user) {
+            const userName = user.displayName || 'User';
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
+        }
+
+        async function loadDashboardData(user) {
+            try {
+                const idToken = await user.getIdToken(true);
+                const response = await fetch('/get-user-trips-proxy', {
+                    headers: { 'Authorization': `Bearer ${idToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch trip data.');
+
+                const trips = await response.json();
+
+                // --- UPDATED LOGIC START ---
+                // Filter the trips array to find only those with status 'booked'
+                const bookedTrips = trips.filter(trip => trip.status === 'booked');
+
+                // Update the dashboard cards with the correct counts
+                document.getElementById('totalTrips').textContent = trips.length;
+                document.getElementById('bookedTrips').textContent = bookedTrips.length;
+                // --- UPDATED LOGIC END ---
+
+                renderTripList(trips);
+
+            } catch (error) {
+                console.error("Error loading dashboard data:", error);
+                document.getElementById('allTripsContainer').innerHTML = `<p style="color:red;">Could not load trips.</p>`;
+            }
+        }
+
+        function renderTripList(trips) {
+            const container = document.getElementById('allTripsContainer');
+            if (trips.length === 0) {
+                container.innerHTML = '<p>You have no saved trips yet.</p>';
+                return;
+            }
+
+            container.innerHTML = ''; // Clear previous content
+            trips.forEach(trip => {
+                const tripLink = document.createElement('a');
+                tripLink.href = `/trip/${trip.id}`;
+                tripLink.className = 'trip-card-link';
+
+                const tripCard = document.createElement('div');
+                tripCard.className = 'trip-card';
+
+                const createdDate = new Date(trip.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+                // --- UPDATED LOGIC START ---
+                // Determine the status and corresponding CSS class
+                const status = trip.status || 'planned'; // Default to 'planned' for old data
+                const statusClass = status === 'booked' ? 'booked' : 'planned';
+                const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+
+                // Add the status badge to the innerHTML
+                tripCard.innerHTML = `
+                    <div class="trip-header">
+                        <h3 class="trip-destination">Trip to ${trip.destination}</h3>
+                        <span class="trip-status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="trip-details">
+                        <p><strong>From:</strong> ${trip.source}</p>
+                        <small>Saved on: ${createdDate}</small>
+                    </div>
+                `;
+                // --- UPDATED LOGIC END ---
+
+                tripLink.appendChild(tripCard);
+                container.appendChild(tripLink);
+            });
+        }
+
+        // ADD THIS ENTIRE NEW FUNCTION
+        function setupProfileTab(user) {
+            const profileForm = document.getElementById('profileForm');
+            const profileNameInput = document.getElementById('profileNameInput');
+            const profileEmailInput = document.getElementById('profileEmailInput');
+            const saveProfileBtn = document.getElementById('saveProfileBtn');
+            const profileMessage = document.getElementById('profileMessage');
+
+            // Populate the form with current user data
+            profileNameInput.value = user.displayName || '';
+            profileEmailInput.value = user.email;
+
+            profileForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Prevent the form from actually submitting
+
+                const newName = profileNameInput.value.trim();
+                if (newName === user.displayName) {
+                    profileMessage.textContent = 'No changes to save.';
+                    profileMessage.style.color = 'orange';
+                    return;
+                }
+
+                saveProfileBtn.disabled = true;
+                saveProfileBtn.textContent = 'Saving...';
+                profileMessage.textContent = '';
+
+                try {
+                    // Use the Firebase SDK to update the profile
+                    await updateProfile(auth.currentUser, {
+                        displayName: newName
+                    });
+
+                    // Update the UI immediately for a good user experience
+                    populateUserInfo(auth.currentUser);
+
+                    profileMessage.textContent = 'Profile updated successfully!';
+                    profileMessage.style.color = 'green';
+
+                } catch (error) {
+                    console.error("Profile update error:", error);
+                    profileMessage.textContent = `Error: ${error.message}`;
+                    profileMessage.style.color = 'red';
+                } finally {
+                    saveProfileBtn.disabled = false;
+                    saveProfileBtn.textContent = 'Save Changes';
+                }
+            });
+        }
+
+        function setupTabNavigation() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    // Prevent default link behavior for tab switching
+                    if (e.currentTarget.dataset.tab) {
+                        e.preventDefault();
+                    }
+
+                    const tabName = e.currentTarget.dataset.tab;
+                    if (!tabName) return; // Ignore links without data-tab attribute like 'Home'
+
+                    // Update active class on links
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
+
+                    // Show/hide tab content
+                    tabContents.forEach(content => {
+                        content.style.display = content.id === `${tabName}-tab` ? 'block' : 'none';
+                    });
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
