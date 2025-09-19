@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmed - AI Trip Planner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body{font-family:'Montserrat',Arial,sans-serif;background:linear-gradient(120deg,#e0eafc,#cfdef3);margin:0;padding:1em;min-height:100vh}.container{max-width:800px;margin:2em auto;background:#fff;border-radius:18px;box-shadow:0 8px 32px rgba(44,62,80,.13);overflow:hidden}.success-header{background:linear-gradient(135deg,#28a745,#20c997);color:#fff;padding:3em 2em;text-align:center;position:relative}.success-icon{font-size:4em;margin-bottom:.5em;animation:bounce 1s ease-in-out}@keyframes bounce{0%,20%,50%,80%,100%{transform:translateY(0)}40%{transform:translateY(-20px)}60%{transform:translateY(-10px)}}.success-header h1{margin:0;font-size:2.5em;font-weight:700}.success-header p{margin:.5em 0 0;font-size:1.2em;opacity:.9}.booking-details{padding:2em}.booking-id{background:#f8faff;border:2px dashed #2d6cdf;border-radius:12px;padding:1.5em;text-align:center;margin-bottom:2em}.booking-id h2{color:#2d6cdf;margin:0 0 .5em;font-size:1.3em}.booking-id .id-number{font-size:1.8em;font-weight:700;color:#1b4fa0;letter-spacing:2px}.details-grid{display:grid;grid-template-columns:1fr 1fr;gap:2em;margin-bottom:2em}.detail-section{background:#f8faff;padding:1.5em;border-radius:12px;border-left:4px solid #2d6cdf}.detail-section h3{color:#1b4fa0;margin:0 0 1em;font-size:1.2em}.detail-item{display:flex;justify-content:space-between;margin-bottom:.8em;padding-bottom:.5em;border-bottom:1px solid #e0eafc}.detail-item:last-child{border-bottom:none;margin-bottom:0}.detail-item .label{font-weight:500;color:#666}.detail-item .value{font-weight:600;color:#1b4fa0}.action-buttons{display:grid;grid-template-columns:1fr 1fr;gap:1em;margin-top:2em}.btn{padding:1em 2em;border:none;border-radius:12px;font-size:1em;font-weight:600;cursor:pointer;transition:all .3s;text-decoration:none;text-align:center;display:inline-block}.btn-primary{background:linear-gradient(90deg,#2d6cdf 60%,#1b4fa0 100%);color:#fff;box-shadow:0 4px 16px rgba(45,108,223,.3)}.btn-secondary{background:#f8faff;color:#2d6cdf;border:2px solid #2d6cdf}.btn:hover{transform:translateY(-2px)}@media (max-width:768px){.details-grid,.action-buttons{grid-template-columns:1fr;gap:1em}.success-header h1{font-size:2em}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-header"><div class="success-icon">🎉</div><h1>Booking Confirmed!</h1><p>Your amazing journey awaits you</p></div>
+        <div class="booking-details">
+            <div class="booking-id"><h2>📄 Your Booking Reference</h2><div class="id-number">{{ confirmation.booking_id }}</div></div>
+            <div class="details-grid">
+                <div class="detail-section">
+                    <h3>🗺️ Trip Information</h3>
+                    {% if confirmation.trip_data %}
+                    <div class="detail-item"><span class="label">To:</span><span class="value">{{ confirmation.trip_data.request.destination }}</span></div>
+                    <div class="detail-item"><span class="label">Start Date:</span><span class="value">{{ confirmation.trip_data.request.start_date }}</span></div>
+                    {% endif %}
+                </div>
+                <div class="detail-section">
+                    <h3>💳 Payment Information</h3>
+                    <div class="detail-item"><span class="label">Status:</span><span class="value" style="color: #28a745;">✅ {{ confirmation.status|title }}</span></div>
+                    <div class="detail-item"><span class="label">Amount Paid:</span><span class="value">₹{{ confirmation.total_amount|int }}</span></div>
+                </div>
+            </div>
+            <!-- THIS IS THE CORRECTED LINK -->
+            <div class="action-buttons">
+                <a href="{{ url_for('index') }}" class="btn btn-primary">✈️ Plan New Trip</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

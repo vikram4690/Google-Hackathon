@@ -2,66 +2,145 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet" />
     <title>AI Trip Planner</title>
     <style>
         body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            font-family: "Montserrat", "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3 70%);
             margin: 0;
-            padding: 1em;
+            padding: 0;
             min-height: 100vh;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 2em auto;
             background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-            padding: 2em 2.5em;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(44, 62, 80, 0.13);
+            padding: 2.5em 3em;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2em;
+        }
+
+        .header img {
+            width: 48px;
+            margin-right: 1em;
         }
 
         h1 {
             text-align: center;
             color: #2d6cdf;
-            margin-bottom: 1.5em;
+            margin-bottom: 0.5em;
+            font-size: 2.2em;
+            font-weight: 700;
+        }
+
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2em 2em;
+        }
+
+        form>div,
+        .interests-container,
+        .date-group {
+            grid-column: span 2;
         }
 
         label {
             display: block;
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 0.5em;
+            color: #1b4fa0;
+            letter-spacing: 0.02em;
         }
 
         input,
-        select {
+        select,
+        textarea {
             display: block;
             margin-bottom: 1.2em;
             width: 100%;
-            padding: 0.6em;
-            border-radius: 6px;
+            padding: 0.7em;
+            border-radius: 8px;
             border: 1px solid #d0d7de;
             font-size: 1em;
             box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #2d6cdf;
+            outline: none;
+            box-shadow: 0 0 0 2px #e0eafc;
+        }
+
+        .date-group {
+            display: flex;
+            gap: 2em;
+        }
+
+        .date-group>div {
+            flex: 1;
+        }
+
+        .interests-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1em;
+            margin-bottom: 1.2em;
+        }
+
+        .interests-container label {
+            background: #e0eafc;
+            border-radius: 20px;
+            padding: 0.5em 1em;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+        }
+
+        .interests-container input[type="checkbox"] {
+            accent-color: #2d6cdf;
+            margin-right: 0.5em;
+        }
+
+        .interests-container label:hover {
+            background: #cfdef3;
         }
 
         button {
-            padding: 0.8em 1.5em;
+            padding: 1em 2em;
             border: none;
-            border-radius: 8px;
-            background: #2d6cdf;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #2d6cdf 60%, #1b4fa0 100%);
             color: #fff;
-            font-size: 1em;
+            font-size: 1.1em;
+            font-weight: 600;
             cursor: pointer;
-            margin-right: 0.5em;
-            margin-top: 0.5em;
-            transition: background 0.2s;
+            margin-top: 1em;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
+            transition: background 0.2s, transform 0.2s;
+            grid-column: span 2;
         }
 
         button:hover {
-            background: #1b4fa0;
+            background: linear-gradient(90deg, #1b4fa0 60%, #2d6cdf 100%);
+            transform: translateY(-2px) scale(1.03);
         }
 
         button:disabled {
@@ -69,138 +148,260 @@
             cursor: not-allowed;
         }
 
-        .result {
-            margin-top: 2em;
+        /* Tooltip Styles - Available on all screen sizes */
+        .tooltip {
+            display: inline-block;
+            position: relative;
+            cursor: help;
+            color: #888;
+            margin-left: 0.3em;
         }
 
-        .day-plan {
-            background: #f4f8fb;
-            padding: 1.5em;
-            margin-bottom: 1.5em;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        .tooltip:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 50%;
+            top: 120%;
+            transform: translateX(-50%);
+            background: #2d6cdf;
+            color: #fff;
+            padding: 0.5em 1em;
+            border-radius: 8px;
+            white-space: nowrap;
+            font-size: 0.95em;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.13);
         }
 
-        .day-plan h3 {
-            color: #1b4fa0;
-            margin-top: 0;
-            border-bottom: 2px solid #dde6f1;
-            padding-bottom: 0.5em;
+        /* Loading Spinner Styles */
+        #spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 4px solid #e0eafc;
+            border-top: 4px solid #2d6cdf;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.7em;
+            vertical-align: middle;
         }
 
-        ul {
-            list-style-type: none;
-            padding-left: 0;
-        }
-
-        li {
-            margin-bottom: 1em;
-        }
-
-        li strong {
-            color: #2d6cdf;
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         #loading {
             text-align: center;
             font-size: 1.2em;
             color: #1b4fa0;
-            font-weight: 500;
+            font-weight: 600;
+            margin-top: 2em;
+            grid-column: span 2;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 700px) {
+            .container {
+                padding: 1em 0.5em;
+            }
+
+            form {
+                grid-template-columns: 1fr;
+                gap: 1em;
+            }
+
+            .date-group {
+                flex-direction: column;
+                gap: 1em;
+            }
+
+            button {
+                width: 100%;
+            }
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>AI Trip Planner for India</h1>
+        <div class="header">
+            <img src="https://img.icons8.com/color/96/india.png" alt="India Icon">
+            <h1>AI Trip Planner for India</h1>
+        </div>
+        <div id="authSection" style="text-align: center; margin-bottom: 1.5em;">
+            <!-- Authentication content will be dynamically loaded here -->
+        </div>
         <form action="/plan" method="post" id="tripForm">
-            <label>Starting Point:</label>
-            <input type="text" id="source" required placeholder="e.g., Delhi">
-
-            <label>Destination:</label>
-            <input type="text" id="destination" required placeholder="e.g., Mumbai">
+            <div>
+                <label>Starting Point
+                    <span class="tooltip" data-tip="Where will your journey begin?">?</span>
+                </label>
+                <input type="text" name="source" id="source" required placeholder="e.g., Delhi" />
+            </div>
+            <div>
+                <label>Destination
+                    <span class="tooltip" data-tip="Where do you want to go?">?</span>
+                </label>
+                <input type="text" name="destination" id="destination" required placeholder="e.g., Mumbai" />
+            </div>
 
             <div class="date-group">
                 <div>
-                    <label>Start Date:</label>
-                    <input type="date" id="start_date" required>
+                    <label>Start Date
+                        <span class="tooltip" data-tip="When will you start your trip?">?</span>
+                    </label>
+                    <input type="date" name="start_date" id="start_date" required />
                 </div>
                 <div>
-                    <label>Return Date:</label>
-                    <input type="date" id="return_date" required>
+                    <label>Return Date
+                        <span class="tooltip" data-tip="When will you return?">?</span>
+                    </label>
+                    <input type="date" name="return_date" id="return_date" required />
                 </div>
             </div>
 
-            <label>Budget (INR):</label>
-            <input type="number" id="budget" required placeholder="e.g., 50000">
+            <div>
+                <label>Budget (INR)
+                    <span class="tooltip" data-tip="How much do you want to spend?">?</span>
+                </label>
+                <input type="number" name="budget" id="budget" required placeholder="e.g., 50000" />
+            </div>
 
             <label>Interests:</label>
             <div class="interests-container">
-                <label><input type="checkbox" name="interests" value="heritage"> Heritage</label>
-                <label><input type="checkbox" name="interests" value="adventure"> Adventure</label>
-                <label><input type="checkbox" name="interests" value="nightlife"> Nightlife</label>
-                <label><input type="checkbox" name="interests" value="nature"> Nature</label>
-                <label><input type="checkbox" name="interests" value="spiritual"> Spiritual</label>
-                <label><input type="checkbox" name="interests" value="food"> Food</label>
-                <label><input type="checkbox" name="interests" value="shopping"> Shopping</label>
-                <label><input type="checkbox" name="interests" value="relaxation"> Relaxation</label>
+                <label><input type="checkbox" name="interests" value="heritage" />
+                    Heritage</label>
+                <label><input type="checkbox" name="interests" value="adventure" />
+                    Adventure</label>
+                <label><input type="checkbox" name="interests" value="nightlife" />
+                    Nightlife</label>
+                <label><input type="checkbox" name="interests" value="nature" />
+                    Nature</label>
+                <label><input type="checkbox" name="interests" value="spiritual" />
+                    Spiritual</label>
+                <label><input type="checkbox" name="interests" value="food" /> Food</label>
+                <label><input type="checkbox" name="interests" value="shopping" />
+                    Shopping</label>
+                <label><input type="checkbox" name="interests" value="relaxation" />
+                    Relaxation</label>
             </div>
 
-            <label>Primary Mode of Transport:</label>
-            <select id="transport_mode">
-                <option value="airplane">Airplane</option>
-                <option value="train">Train</option>
-                <option value="bus">Bus</option>
-                <option value="personal_vehicle">Personal Vehicle</option>
-            </select>
+            <div>
+                <label>Primary Mode of Transport
+                    <span class="tooltip" data-tip="How will you travel?">?</span>
+                </label>
+                <select name="transport_mode" id="transport_mode">
+                    <option value="airplane">Airplane</option>
+                    <option value="train">Train</option>
+                    <option value="bus">Bus</option>
+                    <option value="personal_vehicle">Personal Vehicle</option>
+                </select>
+            </div>
 
-            <label>Language for Itinerary:</label>
-            <select id="language">
-                <option value="English">English</option>
-                <option value="Hindi">Hindi</option>
-                <option value="Assamese">Assamese</option>
-                <option value="Bengali">Bengali</option>
-                <option value="Bodo">Bodo</option>
-                <option value="Dogri">Dogri</option>
-                <option value="Gujarati">Gujarati</option>
-                <option value="Kannada">Kannada</option>
-                <option value="Kashmiri">Kashmiri</option>
-                <option value="Konkani">Konkani</option>
-                <option value="Maithili">Maithili</option>
-                <option value="Malayalam">Malayalam</option>
-                <option value="Manipuri">Manipuri</option>
-                <option value="Marathi">Marathi</option>
-                <option value="Nepali">Nepali</option>
-                <option value="Odia">Odia</option>
-                <option value="Punjabi">Punjabi</option>
-                <option value="Sanskrit">Sanskrit</option>
-                <option value="Santali">Santali</option>
-                <option value="Sindhi">Sindhi</option>
-                <option value="Tamil">Tamil</option>
-                <option value="Telugu">Telugu</option>
-                <option value="Urdu">Urdu</option>
-            </select>
+            <div>
+                <label>Language for Itinerary
+                    <span class="tooltip" data-tip="Choose your preferred language.">?</span>
+                </label>
+                <select name="language" id="language">
+                    <option value="English">English</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Assamese">Assamese</option>
+                    <option value="Bengali">Bengali</option>
+                    <option value="Bodo">Bodo</option>
+                    <option value="Dogri">Dogri</option>
+                    <option value="Gujarati">Gujarati</option>
+                    <option value="Kannada">Kannada</option>
+                    <option value="Kashmiri">Kashmiri</option>
+                    <option value="Konkani">Konkani</option>
+                    <option value="Maithili">Maithili</option>
+                    <option value="Malayalam">Malayalam</option>
+                    <option value="Manipuri">Manipuri</option>
+                    <option value="Marathi">Marathi</option>
+                    <option value="Nepali">Nepali</option>
+                    <option value="Odia">Odia</option>
+                    <option value="Punjabi">Punjabi</option>
+                    <option value="Sanskrit">Sanskrit</option>
+                    <option value="Santali">Santali</option>
+                    <option value="Sindhi">Sindhi</option>
+                    <option value="Tamil">Tamil</option>
+                    <option value="Telugu">Telugu</option>
+                    <option value="Urdu">Urdu</option>
+                </select>
+            </div>
 
-            <label>Additional Requirements:</label>
-            <textarea id="additional_reqs" rows="3"
-                placeholder="e.g., I need wheelchair accessibility, prefer vegetarian food, etc."></textarea>
+            <div>
+                <label>Additional Requirements
+                    <span class="tooltip" data-tip="Any special needs or preferences?">?</span>
+                </label>
+                <textarea name="additional_reqs" id="additional_reqs" rows="3"
+                    placeholder="e.g., I need wheelchair accessibility, prefer vegetarian food, etc."></textarea>
+            </div>
 
             <button type="submit" id="submitBtn">Get Itinerary</button>
         </form>
 
-        <div id="loading" style="display:none;">Generating your personalized itinerary...</div>
+        <div id="loading" style="display:none;">
+            <span id="spinner"></span> Generating your personalized itinerary...
+        </div>
     </div>
     <script>
-        const tripForm = document.querySelector('form');
-        const submitBtn = document.getElementById('submitBtn');
-        const loadingDiv = document.getElementById('loading');
+        const tripForm = document.querySelector("form");
+        const submitBtn = document.getElementById("submitBtn");
+        const loadingDiv = document.getElementById("loading");
 
-        tripForm.addEventListener('submit', function () {
+        tripForm.addEventListener("submit", function () {
             // This code runs when the user clicks the submit button
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Generating...'; // Optional: Change button text
-            loadingDiv.style.display = 'block';
+            submitBtn.textContent = "Generating..."; // Optional: Change button text
+            loadingDiv.style.display = "block";
         });
+    </script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLGw84oAfsi1hovFmFxedo6V_J-luj_Sg",
+            authDomain: "principal-lane-470311-j4.firebaseapp.com",
+            projectId: "principal-lane-470311-j4",
+            storageBucket: "principal-lane-470311-j4.firebasestorage.app",
+            messagingSenderId: "215616135597",
+            appId: "1:215616135597:web:99558a378db116fccdc124",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            const authSection = document.getElementById('authSection');
+            if (user) {
+                // User is signed in - THIS IS THE LINK WE ARE FIXING
+                authSection.innerHTML = `
+                    <span style="color: #2d6cdf; font-weight: 600; margin-right: 1em;">
+                        Welcome, ${user.displayName || user.email}!
+                    </span>
+                    <a href="/dashboard" style="color: #2d6cdf; text-decoration: none; margin-right: 1em; font-weight: 600;">Dashboard</a>
+                    <button onclick="logout()" style="background: #dc3545; padding: 0.4em 0.8em; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                        Logout
+                    </button>
+                `;
+            } else {
+                // User is signed out
+                authSection.innerHTML = `
+                    <a href="/login" style="color: #2d6cdf; text-decoration: none; margin-right: 1em; font-weight: 600;">Login</a>
+                    <a href="/signup" style="color: #2d6cdf; text-decoration: none; font-weight: 600;">Sign Up</a>
+                `;
+            }
+        });
+
+        window.logout = async function () {
+            try {
+                await signOut(auth);
+                window.location.href = "/login";
+            } catch (error) { console.error("Logout error:", error); }
+        }
     </script>
 </body>
 

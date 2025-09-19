@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AI Trip Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Montserrat', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+        }
+
+        .container {
+            background: #fff;
+            padding: 2.5rem;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(44, 62, 80, 0.13);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5em;
+        }
+
+        .header img {
+            width: 40px;
+            margin-right: 0.8em;
+        }
+
+        h2 {
+            margin-bottom: 1.5rem;
+            color: #2d6cdf;
+            font-weight: 700;
+            font-size: 1.8em;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            margin: 0.8rem 0;
+            border-radius: 8px;
+            border: 1px solid #d0d7de;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: #2d6cdf;
+            outline: none;
+            box-shadow: 0 0 0 2px #e0eafc;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            background: linear-gradient(90deg, #2d6cdf 60%, #1b4fa0 100%);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        button:hover {
+            background: linear-gradient(90deg, #1b4fa0 60%, #2d6cdf 100%);
+            transform: translateY(-2px);
+        }
+
+        p {
+            margin-top: 1.5rem;
+            font-size: 0.95rem;
+            color: #666;
+        }
+
+        a {
+            color: #2d6cdf;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        #errorMsg {
+            color: #d82c0d;
+            font-size: 0.9rem;
+            margin-top: 0.8rem;
+            padding: 0.6rem;
+            background: #ffebe9;
+            border-radius: 6px;
+            border: 1px solid #ffc1b8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://img.icons8.com/color/96/india.png" alt="India Icon">
+            <h2>Login</h2>
+        </div>
+        <input type="email" id="loginEmail" placeholder="Email" required>
+        <input type="password" id="loginPassword" placeholder="Password" required>
+        <button onclick="login()">Login</button>
+        <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign Up</a></p>
+        <div id="errorMsg" style="display:none;"></div>
+    </div>
+
+    <!-- In login.html, make sure your script looks exactly like this -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLGw84oAfsi1hovFmFxedo6V_J-luj_Sg",
+            authDomain: "principal-lane-470311-j4.firebaseapp.com",
+            projectId: "principal-lane-470311-j4",
+            storageBucket: "principal-lane-470311-j4.firebasestorage.app",
+            messagingSenderId: "215616135597",
+            appId: "1:215616135597:web:99558a378db116fccdc124",
+            measurementId: "G-VB5PXDL7ZZ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Make sure your login function is this new async version
+        window.login = async function () {
+            const email = document.getElementById("loginEmail").value;
+            const password = document.getElementById("loginPassword").value;
+            const errorMsg = document.getElementById("errorMsg");
+            errorMsg.style.display = "none";
+
+            try {
+                // Step 1: Sign in with Firebase on the client
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+                // Step 2: Get the user's ID token (the proof of login)
+                const idToken = await userCredential.user.getIdToken();
+
+                // Step 3: Send the token to our Flask backend to create a session
+                const response = await fetch('/sessionLogin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ idToken: idToken })
+                });
+
+                if (response.ok) {
+                    // Step 4: Only if the backend session is created, redirect to the dashboard
+                    window.location.href = "/";
+                } else {
+                    // This error triggers if the /sessionLogin route fails
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Server session login failed.');
+                }
+
+            } catch (error) {
+                errorMsg.style.display = "block";
+                errorMsg.textContent = error.message;
+            }
+        }
+    </script>
+</body>
+
+</html>

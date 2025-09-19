@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Saved Itinerary</title>
+    <style>
+        /* This CSS is copied from itinerary.html for consistent styling */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            margin: 0;
+            padding: 1em;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2em auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            padding: 2em 2.5em;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+            color: #2d6cdf;
+        }
+
+        .day-plan {
+            background: #f4f8fb;
+            padding: 1.5em;
+            margin-bottom: 1.5em;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .day-plan h3 {
+            color: #1b4fa0;
+            margin-top: 0;
+            border-bottom: 2px solid #dde6f1;
+            padding-bottom: 0.5em;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        li {
+            margin-bottom: 1em;
+        }
+
+        li strong {
+            color: #2d6cdf;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 10px;
+            margin-bottom: 2em;
+        }
+        
+        .footer-link {
+            text-align: center;
+            margin-top: 2.5em;
+            font-size: 1.1em;
+        }
+
+        .footer-link a {
+            color: #2d6cdf;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .footer-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- The 'itinerary_data' variable comes from the app.py render_template call -->
+        <h1>Your Trip to {{ itinerary_data.request.destination }}</h1>
+
+        <div id="map"
+            style="height: 400px; width: 100%; border-radius: 10px; margin-bottom: 2em; background-color: #eee;"></div>
+        <!-- Map will be rendered here -->
+
+        <!-- This checks if the itinerary data exists before trying to display it -->
+        {% if itinerary_data %}
+        <!-- Loop through each day in the plan -->
+        {% for day in itinerary_data.itinerary.plan %}
+        <div class="day-plan">
+            <h3>Day {{ day.day }}: {{ day.theme }} ({{ day.date }})</h3>
+            <ul>
+                <!-- Loop through each activity in the day -->
+                {% for activity in day.activities %}
+                <li>
+                    <strong>{{ activity.time }}:</strong> {{ activity.description }}
+                    <em>({{ activity.location_name }})</em>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+
+        <!-- Display cost breakdown -->
+        <div class="day-plan">
+            <h3>Estimated Cost Breakdown</h3>
+            {% set costs = itinerary_data.itinerary.cost_breakdown %}
+            <ul>
+                <li><strong>Accommodation:</strong> ₹{{ costs.accommodation_estimate_inr | int }}</li>
+                <li><strong>Transport:</strong> ₹{{ costs.transport_estimate_inr | int }}</li>
+                <li><strong>Activities:</strong> ₹{{ costs.activities_estimate_inr | int }}</li>
+                <li><strong>Food:</strong> ₹{{ costs.food_estimate_inr | int }}</li>
+                <hr>
+                <li><strong>Total Estimated Cost:</strong> ₹{{ costs.total_estimate_inr | int }}</li>
+            </ul>
+        </div>
+        
+        <div class="footer-link">
+            <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+        </div>
+
+        {% else %}
+        <h2>Itinerary not found.</h2>
+        <p><a href="{{ url_for('dashboard') }}">Please go back to your dashboard.</a></p>
+        {% endif %}
+    </div>
+
+    <!-- The Map rendering script is kept as it's needed for display -->
+    <script>
+        function initMap() {
+            console.log("🗺️ InitMap called for trip details!");
+            
+            const itineraryData = {{ itinerary_data | tojson | safe }};
+
+            if (!itineraryData || !itineraryData.itinerary || !itineraryData.itinerary.plan || !itineraryData.itinerary.plan.length) {
+                document.getElementById('map').innerHTML = '<p style="text-align:center; padding-top: 150px; color: #666;">Map data is not available for this itinerary.</p>';
+                return;
+            }
+
+            let allActivities = [];
+            itineraryData.itinerary.plan.forEach(day => {
+                if (day.activities) {
+                    day.activities.forEach(activity => {
+                        if (activity.latitude && activity.longitude) {
+                            allActivities.push(activity);
+                        }
+                    });
+                }
+            });
+
+            if (allActivities.length === 0) {
+                document.getElementById('map').innerHTML = '<p style="text-align:center; padding-top: 150px; color: #666;">No location coordinates found in activities.</p>';
+                return;
+            }
+
+            const mapCenter = {
+                lat: allActivities[0].latitude,
+                lng: allActivities[0].longitude
+            };
+
+            const map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 12,
+                center: mapCenter,
+            });
+
+            allActivities.forEach((activity, index) => {
+                const marker = new google.maps.Marker({
+                    position: { lat: activity.latitude, lng: activity.longitude },
+                    map: map,
+                    title: activity.location_name,
+                    label: (index + 1).toString()
+                });
+            });
+        }
+    </script>
+    
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+
+</body>
+
+</html>
