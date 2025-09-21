@@ -246,7 +246,9 @@ def plan_trip():
     # --- NEW PROMPT INSTRUCTING THE AI TO USE THE TOOL ---
     # --- FINAL, MORE AGGRESSIVE PROMPT ---
     prompt = f"""
-    You are an expert travel agent. Your task is to create a realistic itinerary based on user input and real-world data.
+    You are an expert travel agent. Create a realistic itinerary based on user input and real-world data.
+
+    **IMPORTANT: Do NOT include any Python code in your response. Your response MUST be ONLY a valid JSON object.**
 
     **Step 1: Get Real-World Data**
     You MUST first call the `get_average_hotel_price` tool for the user's destination: {data.get('destination')}.
@@ -305,7 +307,7 @@ def plan_trip():
     for attempt in range(max_retries):
         try:
             # --- START of the main try block ---
-            chat = model.start_chat()
+            chat = model.start_chat(response_validation=False)
             response = chat.send_message(prompt)
 
             # --- The safe while loop for tool calls ---
@@ -356,18 +358,29 @@ def plan_trip():
             return redirect(url_for('show_itinerary'))
 
         except ResourceExhausted as e:
-            # ... your existing ResourceExhausted handling ...
             print(f"--- Attempt {attempt + 1} failed: Resource Exhausted. Retrying... ---")
             if attempt + 1 == max_retries:
-                return f"AI service is busy (429). Please try again.", 503
+            # Store the error in session for the template to display
+                flash("Oops! Our AI travel planner is a bit overloaded right now. Please try again in a minute or two.", "error")
+                return redirect(url_for('index'))
             time.sleep(2)
         
         except Exception as e:
-            # This catches ANY error, including parsing errors, and allows for a retry
-            print(f"An error occurred during trip planning or parsing: {e}")
-            if attempt + 1 == max_retries:
-                return f"An error occurred: {e}", 500
-            time.sleep(1)
+            error_message = str(e)
+            print(f"An error occurred during trip planning or parsing: {error_message}")
+            
+            if "Malformed function call" in error_message:
+                # Handle this specific error case
+                flash("Our AI travel planner is having trouble creating your itinerary. Please try again with different dates or destination.", "error")
+                return redirect(url_for('index'))
+            elif "Resource Exhausted" in error_message or "429" in error_message:
+                # Handle rate limit errors
+                flash("Oops! Our AI travel planner is a bit overloaded right now. Please try again in a minute or two.", "error")
+                return redirect(url_for('index'))
+            else:
+                # Generic error
+                flash(f"Something went wrong while creating your itinerary. Please try again.", "error")
+                return redirect(url_for('index'))
 
 @app.route('/regenerate', methods=['POST'])
 def regenerate_itinerary():
@@ -946,63 +959,51 @@ def delete_share_link_proxy():
     except Exception as e:
         return jsonify({"status": "error", "message": f"Error deleting share link: {str(e)}"}), 500
 
+# ADD THIS NEW, CORRECTED FUNCTION IN ITS PLACE
 def get_todays_weather(destination: str) -> dict:
     """
-    Gets the CURRENT weather conditions using the Google Cloud Weather API,
-    following the official POST request documentation.
+    Gets the current weather forecast for a specific city using the OpenWeatherMap API.
     """
-
-     # --- ADD THIS DEBUG BLOCK ---
-    api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
-    print(f"--- DEBUG: Attempting to use API Key ending in: ...{api_key[-4:]}")
-    # --- END OF DEBUG BLOCK ---
-
-
-    try:
-        geocode_result = gmaps.geocode(destination)
-        if not geocode_result:
-            return {"error": "Could not find location."}
-        
-        lat = geocode_result[0]['geometry']['location']['lat']
-        lng = geocode_result[0]['geometry']['location']['lng']
-    except Exception as e:
-        return {"error": f"Failed to get coordinates for {destination}: {e}"}
-
-    # --- FINAL CORRECTED API CALL matching the documentation EXACTLY ---
+    api_key = os.getenv('OPENWEATHER_API_KEY')
+    print(f"--- DEBUG: OpenWeather API Key being used: {api_key}")
+    if not api_key:
+        print("--- ERROR (OpenWeather Tool): OPENWEATHER_API_KEY not found in .env file. ---")
+        return {"error": "Weather service is not configured."}
     
-    # 1. The URL MUST end in ':lookup' and include the API key
-    endpoint = f"https://weather.googleapis.com/v1/currentConditions:lookup?key={os.environ.get('GOOGLE_MAPS_API_KEY')}"
-
-    # 2. The payload for the POST request contains ONLY the location
-    payload = {
-        "location": {
-            "latitude": lat,
-            "longitude": lng
-        }
+    # Construct the API URL
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": destination,
+        "appid": api_key,
+        "units": "metric"  # For temperature in Celsius
     }
-
+    
+    print(f"--- TOOL (OpenWeather): Getting weather for {destination} ---")
+    
     try:
-        # 3. The method MUST be a POST request
-        response = requests.post(endpoint, json=payload, timeout=10)
-        response.raise_for_status()
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status() # Raise an error for bad status codes
         data = response.json()
-        
-        current_conditions = data.get('currentConditions', {})
-        condition_text = current_conditions.get('condition', {}).get('text', 'Unknown')
-        temp_value = current_conditions.get('temperature', {}).get('value', 0)
+
+        # Parse the response from OpenWeatherMap
+        condition = data.get('weather', [{}])[0].get('main', 'Unknown')
+        description = data.get('weather', [{}])[0].get('description', 'No description')
+        temp_celsius = data.get('main', {}).get('temp', 0)
 
         weather_report = {
-            "condition": condition_text,
-            "description": f"Current condition is {condition_text.lower()}",
-            "temperature_celsius": temp_value
+            "condition": condition,
+            "description": f"Current condition is {description}",
+            "temperature_celsius": temp_celsius
         }
-        print(f"--- TOOL (Google Weather - Current Conditions): Forecast for {destination}: {weather_report} ---")
+        
+        print(f"--- TOOL (OpenWeather): Forecast for {destination}: {weather_report} ---")
         return weather_report
+        
     except requests.exceptions.HTTPError as e:
-        print(f"--- ERROR (Google Weather Tool): HTTP Error: {e.response.status_code} - {e.response.text} ---")
+        print(f"--- ERROR (OpenWeather Tool): HTTP Error: {e.response.status_code} - {e.response.text} ---")
         return {"error": f"Could not retrieve weather: {e.response.status_code}"}
     except Exception as e:
-        print(f"--- ERROR (Google Weather Tool): A general error occurred: {e} ---")
+        print(f"--- ERROR (OpenWeather Tool): A general error occurred: {e} ---")
         return {"error": f"Could not retrieve weather: {e}"}
 
 
@@ -1037,7 +1038,7 @@ def adjust_for_weather():
     for attempt in range(max_retries):
         try:
             # --- Your existing AI logic for adjustments ---
-            chat = model.start_chat()
+            chat = model.start_chat(response_validation=False)
             response = chat.send_message(prompt)
             
             while True:
