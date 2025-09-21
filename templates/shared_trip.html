@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ itinerary_data.request.destination }} Trip Plan</title>
+
+    <!-- SEO Meta Tags for Social Sharing -->
+    <meta property="og:title" content="Amazing Trip to {{ itinerary_data.request.destination }}">
+    <meta property="og:description"
+        content="Check out this {{ itinerary_data.itinerary.plan|length }}-day itinerary from {{ itinerary_data.request.source }} to {{ itinerary_data.request.destination }}!">
+    <meta property="og:image" content="{{ request.host_url }}api/trip-preview/{{ share_data.share_id }}.jpg">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:type" content="website">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Amazing Trip to {{ itinerary_data.request.destination }}">
+    <meta name="twitter:description" content="Check out this {{ itinerary_data.itinerary.plan|length }}-day itinerary!">
+    <meta name="twitter:image" content="{{ request.host_url }}api/trip-preview/{{ share_data.share_id }}.jpg">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', Arial, sans-serif;
+            background: linear-gradient(120deg, #e0eafc, #cfdef3);
+            margin: 0;
+            padding: 1em;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 2em auto;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(44, 62, 80, 0.13);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2d6cdf, #1b4fa0);
+            color: white;
+            padding: 2em;
+            text-align: center;
+        }
+
+        .content {
+            padding: 2em;
+        }
+
+        .trip-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1em;
+            margin: 2em 0;
+        }
+
+        .stat-card {
+            background: #f8faff;
+            padding: 1.5em;
+            border-radius: 12px;
+            text-align: center;
+            border-left: 4px solid #2d6cdf;
+        }
+
+        .day-plan {
+            background: #f8faff;
+            padding: 1.5em;
+            margin: 1.5em 0;
+            border-radius: 12px;
+            border-left: 4px solid #2d6cdf;
+        }
+
+        .cost-breakdown {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 2em;
+            border-radius: 12px;
+            margin: 2em 0;
+        }
+
+        .attribution {
+            text-align: center;
+            padding: 1em;
+            background: #f8faff;
+            margin-top: 2em;
+            border-radius: 12px;
+        }
+
+        .cta-section {
+            background: linear-gradient(135deg, #2d6cdf, #1b4fa0);
+            color: white;
+            padding: 2em;
+            text-align: center;
+            margin: 2em 0;
+            border-radius: 12px;
+        }
+
+        .btn {
+            padding: 0.8em 2em;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0.5em;
+            transition: all 0.3s;
+        }
+
+        .btn-light {
+            background: white;
+            color: #2d6cdf;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 12px;
+            margin: 2em 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Trip to {{ itinerary_data.request.destination }}</h1>
+            <p>{{ itinerary_data.itinerary.plan|length }}-day itinerary from {{ itinerary_data.request.source }}</p>
+            <p>👁️ {{ share_data.view_count }} views</p>
+        </div>
+
+        <div class="content">
+            <div class="trip-stats">
+                <div class="stat-card">
+                    <h3>🗓️ Duration</h3>
+                    <p>{{ itinerary_data.itinerary.plan|length }} Days</p>
+                </div>
+                <div class="stat-card">
+                    <h3>💰 Total Cost</h3>
+                    <p>₹{{ itinerary_data.itinerary.cost_breakdown.total_estimate_inr|int }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>🚗 Transport</h3>
+                    <p>{{ itinerary_data.request.transport_mode|title }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>💫 Interests</h3>
+                    <p>{{ itinerary_data.request.interests|join(', ')|title }}</p>
+                </div>
+            </div>
+
+            <div id="map"></div>
+
+            {% for day in itinerary_data.itinerary.plan %}
+            <div class="day-plan">
+                <h3>Day {{ day.day }}: {{ day.theme }} ({{ day.date }})</h3>
+                <ul style="list-style: none; padding: 0;">
+                    {% for activity in day.activities %}
+                    <li style="margin: 1em 0; padding: 0.5em; background: white; border-radius: 8px;">
+                        <strong style="color: #2d6cdf;">{{ activity.time }}:</strong>
+                        {{ activity.description }}
+                        <em style="color: #666;">({{ activity.location_name }})</em>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+
+            <div class="cost-breakdown">
+                <h3>💰 Detailed Cost Breakdown</h3>
+                {% set costs = itinerary_data.itinerary.cost_breakdown %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1em;">
+                    <div>
+                        <h4>🏨 Accommodation</h4>
+                        <p style="font-size: 1.5em;">₹{{ costs.accommodation_estimate_inr|int }}</p>
+                    </div>
+                    <div>
+                        <h4>🚗 Transport</h4>
+                        <p style="font-size: 1.5em;">₹{{ costs.transport_estimate_inr|int }}</p>
+                    </div>
+                    <div>
+                        <h4>🎯 Activities</h4>
+                        <p style="font-size: 1.5em;">₹{{ costs.activities_estimate_inr|int }}</p>
+                    </div>
+                    <div>
+                        <h4>🍽️ Food</h4>
+                        <p style="font-size: 1.5em;">₹{{ costs.food_estimate_inr|int }}</p>
+                    </div>
+                </div>
+                <hr style="margin: 1em 0; border: 1px solid rgba(255,255,255,0.3);">
+                <h3 style="text-align: center; font-size: 2em;">
+                    Total: ₹{{ costs.total_estimate_inr|int }}
+                </h3>
+            </div>
+
+            <div class="cta-section">
+                <h3>🚀 Create Your Own Amazing Trip!</h3>
+                <p>This itinerary was created using AI Trip Planner. Plan your perfect trip in minutes!</p>
+                <a href="/" class="btn btn-light">✨ Plan My Trip</a>
+                <a href="/signup" class="btn btn-light">📝 Sign Up Free</a>
+            </div>
+
+            <div class="attribution">
+                <p>📍 Trip planned by <strong>{{ creator_info }}</strong> using AI Trip Planner</p>
+                <p><small>Shared {{ share_data.view_count }} times</small></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Script -->
+    <script>
+        function initMap() {
+            const itineraryData = {{ itinerary_data | tojson | safe
+        }};
+
+        let allActivities = [];
+        itineraryData.itinerary.plan.forEach(day => {
+            if (day.activities) {
+                day.activities.forEach(activity => {
+                    if (activity.latitude && activity.longitude) {
+                        allActivities.push(activity);
+                    }
+                });
+            }
+        });
+
+        if (allActivities.length === 0) {
+            document.getElementById('map').innerHTML = '<p style="text-align:center; padding: 150px; color: #666;">Map not available</p>';
+            return;
+        }
+
+        const mapCenter = {
+            lat: allActivities[0].latitude,
+            lng: allActivities[0].longitude
+        };
+
+        const map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 12,
+            center: mapCenter,
+        });
+
+        allActivities.forEach((activity, index) => {
+            new google.maps.Marker({
+                position: { lat: activity.latitude, lng: activity.longitude },
+                map: map,
+                title: activity.location_name,
+                label: (index + 1).toString()
+            });
+        });
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=initMap"></script>
+</body>
+
+</html>

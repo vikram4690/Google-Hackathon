@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import json
 import vertexai
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, flash
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, flash, send_file
 from flask_cors import CORS
 from vertexai.generative_models import GenerativeModel, Tool, FunctionDeclaration, Part
 import googlemaps
@@ -10,6 +10,19 @@ import firebase_admin
 from firebase_admin import credentials, auth, firestore
 import requests
 from datetime import datetime, date, timedelta
+import uuid
+import qrcode
+import io
+import base64
+from urllib.parse import quote
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+import time
+from google.api_core.exceptions import ResourceExhausted
 
 
 
@@ -23,10 +36,13 @@ app.config['SECRET_KEY'] = 'your-super-secret-key-change-this'
 SAVE_TRIP_FUNCTION_URL = "https://asia-south1-principal-lane-470311-j4.cloudfunctions.net/save-trip"
 GET_TRIPS_FUNCTION_URL = "https://asia-south1-principal-lane-470311-j4.cloudfunctions.net/get-trips"
 BOOK_TRIP_FUNCTION_URL = "https://asia-south1-principal-lane-470311-j4.cloudfunctions.net/book-trip"
+MANAGE_SHARES_FUNCTION_URL = "https://asia-south1-principal-lane-470311-j4.cloudfunctions.net/manage-trip-shares"
 
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
+
+
 
 # --- Configuration ---
 VERTEX_PROJECT = os.environ.get('GOOGLE_PROJECT_ID')
@@ -50,6 +66,7 @@ def get_average_hotel_price(destination: str) -> float:
         "X-RapidAPI-Key": api_key,
         "X-RapidAPI-Host": "booking-com.p.rapidapi.com"
     }
+    
 
     # --- Step 1: Get the Destination ID from the city name ---
     print(f"--- TOOL (Step 1): Getting Destination ID for {destination} ---")
@@ -127,8 +144,22 @@ get_average_hotel_price_func = FunctionDeclaration(
     },
 )
 
-hotel_pricing_tool = Tool(
-    function_declarations=[get_average_hotel_price_func],
+
+weather_tool_func = FunctionDeclaration(
+    name="get_todays_weather",
+    description="Gets the current weather forecast for a specific city in India. Use this to make real-time adjustments to a travel plan.",
+    parameters={
+        "type": "object",
+        "properties": { "destination": { "type": "string", "description": "The city name, e.g., 'Mumbai'."} },
+        "required": ["destination"]
+    },
+)
+
+combined_tool = Tool(
+    function_declarations=[
+        get_average_hotel_price_func, 
+        weather_tool_func
+    ],
 )
 
 print("--- DEBUG: hotel_pricing_tool has been DEFINED. ---")
@@ -140,7 +171,7 @@ try:
     print("--- DEBUG: About to INITIALIZE the model... ---")
     
     # THIS IS THE CRUCIAL LINE THAT CREATES THE 'model' VARIABLE
-    model = GenerativeModel("gemini-1.5-flash-002", tools=[hotel_pricing_tool])
+    model = GenerativeModel("gemini-1.5-flash-002", tools=[combined_tool])
     
     # This line initializes the Google Maps client
     gmaps = googlemaps.Client(key=os.environ.get('GOOGLE_MAPS_API_KEY'))
@@ -225,6 +256,9 @@ def plan_trip():
 
     **Step 3: Generate the Final Output**
     After all calculations are done, your entire response MUST be ONLY a single, valid JSON object. Do not add any conversational text or formatting like "```json". The JSON object MUST strictly follow this exact structure:
+    ***CRITICAL LANGUAGE INSTRUCTION: All text values within the JSON, such as 'theme' and 'description', MUST be written in the following language: {data.get('language', 'English')}.***
+
+    The JSON object MUST strictly follow this exact structure:
     {{
         "plan": [
             {{
@@ -260,63 +294,80 @@ def plan_trip():
     - Itinerary Language: {data.get('language', 'English')}
     """
 
-    try:
-        # --- NEW TOOL-USE LOGIC ---
-        chat = model.start_chat()
-        # Send the initial prompt to the model
-        response = chat.send_message(prompt)
-        
-        # The model will respond with a request to call our function.
-        function_call = response.candidates[0].content.parts[0].function_call
-        
-        if function_call and function_call.name == "get_average_hotel_price":
-            # Extract the destination argument provided by the model
-            destination_arg = function_call.args['destination']
-            
-            # Call our actual Python function to get the real price
-            price_result = get_average_hotel_price(destination=destination_arg)
-            
-            # Send the result back to the model
-            response = chat.send_message(
-                Part.from_function_response(
-                    name="get_average_hotel_price",
-                    response={
-                        "price": price_result,
-                    }
-                )
-            )
+    # --- Start of new structure ---
+    # --- This is the new, corrected structure ---
 
-        # The model will now use the price to generate the final itinerary.
-        raw_text = response.text
-        
-        # --- The rest of the parsing logic is the same ---
-        print("=== AI RESPONSE DEBUG (after tool use) ===")
-        print("Raw response length:", len(raw_text))
-        print("First 200 chars:", raw_text[:200])
-        print("==========================================")
-        
-        cleaned_text = raw_text.strip()
-        if "```json" in cleaned_text:
-            cleaned_text = cleaned_text.split("```json")[1].split("```")[0]
-        elif "```" in cleaned_text:
-            cleaned_text = cleaned_text.split("```")[1].split("```")[0]
-        
-        json_start = cleaned_text.find('{')
-        json_end = cleaned_text.rfind('}') + 1
-        
-        if json_start == -1 or json_end == 0:
-            raise ValueError("No valid JSON object found in response after tool use")
-            
-        json_text = cleaned_text[json_start:json_end]
-        ai_generated_itinerary = json.loads(json_text)
-        
-        final_response = {"request": data, "itinerary": ai_generated_itinerary}
-        session['itinerary_data'] = final_response
-        return redirect(url_for('show_itinerary'))
+    # --- This is the new, more robust multi-tool handling loop ---
 
-    except Exception as e:
-        print(f"Error during trip planning with tools: {e}")
-        return f"An error occurred during itinerary generation: {e}", 500
+    # --- This is the final, corrected structure for the plan_trip function ---
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # --- START of the main try block ---
+            chat = model.start_chat()
+            response = chat.send_message(prompt)
+
+            # --- The safe while loop for tool calls ---
+            while True:
+                part = response.candidates[0].content.parts[0]
+                function_call = getattr(part, 'function_call', None)
+
+                if not function_call:
+                    break # Exit loop if AI is done calling tools
+
+                if function_call.name == "get_average_hotel_price":
+                    # ... your hotel tool logic ...
+                    price_result = get_average_hotel_price(destination=function_call.args['destination'])
+                    response = chat.send_message(Part.from_function_response(name="get_average_hotel_price", response={"price": price_result}))
+
+                elif function_call.name == "get_todays_weather":
+                    # ... your weather tool logic ...
+                    weather_result = get_todays_weather(destination=function_call.args['destination'])
+                    response = chat.send_message(Part.from_function_response(name="get_todays_weather", response=weather_result))
+                
+                else:
+                    break # Unknown tool, exit loop
+            
+            # --- PARSING LOGIC IS NOW BACK INSIDE THE SAME TRY BLOCK ---
+            raw_text = response.text
+            
+            print("=== AI RESPONSE DEBUG (after all tool use) ===")
+            
+            cleaned_text = raw_text.strip()
+            if "```json" in cleaned_text:
+                cleaned_text = cleaned_text.split("```json")[1].split("```")[0]
+            elif "```" in cleaned_text:
+                cleaned_text = cleaned_text.split("```")[1].split("```")[0]
+            
+            json_start = cleaned_text.find('{')
+            json_end = cleaned_text.rfind('}') + 1
+            
+            if json_start == -1 or json_end == 0:
+                raise ValueError("No valid JSON object found in AI response")
+                
+            json_text = cleaned_text[json_start:json_end]
+            ai_generated_itinerary = json.loads(json_text)
+            
+            final_response = {"request": data, "itinerary": ai_generated_itinerary}
+            session['itinerary_data'] = final_response
+
+            # If we get here, everything worked. Redirect and exit the function.
+            return redirect(url_for('show_itinerary'))
+
+        except ResourceExhausted as e:
+            # ... your existing ResourceExhausted handling ...
+            print(f"--- Attempt {attempt + 1} failed: Resource Exhausted. Retrying... ---")
+            if attempt + 1 == max_retries:
+                return f"AI service is busy (429). Please try again.", 503
+            time.sleep(2)
+        
+        except Exception as e:
+            # This catches ANY error, including parsing errors, and allows for a retry
+            print(f"An error occurred during trip planning or parsing: {e}")
+            if attempt + 1 == max_retries:
+                return f"An error occurred: {e}", 500
+            time.sleep(1)
 
 @app.route('/regenerate', methods=['POST'])
 def regenerate_itinerary():
@@ -581,13 +632,459 @@ def trip_details(trip_id):
         # 4. **THE FIX IS HERE**
         # The data is already a dictionary (map) in Firestore, so we don't need json.loads.
         full_itinerary_data = trip_data['itinerary_content']
-        
+        today_date = date.today().strftime("%Y-%m-%d")
         # 5. Render a new template, passing the full itinerary data to it
-        return render_template('trip_details.html', itinerary_data=full_itinerary_data)
+        return render_template('trip_details.html', itinerary_data=full_itinerary_data,today_date=today_date,maps_api_key=os.environ.get('GOOGLE_MAPS_API_KEY'))
 
     except Exception as e:
         # Handle any other errors gracefully
         return f"An error occurred: {e}", 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)), debug=True)
+@app.route('/share-trip/<trip_id>')
+def make_trip_shareable(trip_id):
+    """Generate a public shareable link for a trip."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        # Verify user owns this trip
+        db = firestore.client()
+        trip_ref = db.collection('trips').document(trip_id)
+        trip_doc = trip_ref.get()
+        
+        if not trip_doc.exists or trip_doc.to_dict().get('user_id') != session['user_id']:
+            return "Unauthorized", 403
+            
+        # Generate unique share ID
+        share_id = str(uuid.uuid4())
+        
+        # Create shareable version
+        share_data = {
+            'original_trip_id': trip_id,
+            'share_id': share_id,
+            'created_by': session['user_id'],
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'is_public': True,
+            'view_count': 0
+        }
+        
+        db.collection('shared_trips').document(share_id).set(share_data)
+        
+        # Generate shareable URL
+        share_url = request.host_url + f'shared/{share_id}'
+        
+        return render_template('share_success.html', 
+                             share_url=share_url, 
+                             trip_id=trip_id,
+                             qr_code=generate_qr_code(share_url))
+        
+    except Exception as e:
+        return f"Error creating shareable link: {str(e)}", 500
+
+@app.route('/shared/<share_id>')
+def view_shared_trip(share_id):
+    """Public view of shared trip - no authentication required."""
+    try:
+        db = firestore.client()
+        
+        # Get share data
+        share_ref = db.collection('shared_trips').document(share_id)
+        share_doc = share_ref.get()
+        
+        if not share_doc.exists:
+            return render_template('share_not_found.html'), 404
+            
+        share_data = share_doc.to_dict()
+        
+        # Increment view count
+        share_ref.update({'view_count': firestore.Increment(1)})
+        
+        # Get original trip data
+        trip_ref = db.collection('trips').document(share_data['original_trip_id'])
+        trip_doc = trip_ref.get()
+        
+        if not trip_doc.exists:
+            return render_template('share_not_found.html'), 404
+            
+        trip_data = trip_doc.to_dict()
+        itinerary_data = trip_data['itinerary_content']
+        
+        # Get creator info (optional - for attribution)
+        creator_info = get_user_display_name(share_data['created_by'])
+        
+        return render_template('shared_trip.html', 
+                             itinerary_data=itinerary_data,
+                             share_data=share_data,
+                             creator_info=creator_info,
+                             maps_api_key=os.environ.get('GOOGLE_MAPS_API_KEY'))
+        
+    except Exception as e:
+        return f"Error loading shared trip: {str(e)}", 500
+
+@app.route('/export-pdf/<trip_id>')
+def export_trip_pdf(trip_id):
+    """Export trip as PDF."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        # Get trip data (verify ownership)
+        db = firestore.client()
+        trip_ref = db.collection('trips').document(trip_id)
+        trip_doc = trip_ref.get()
+        
+        if not trip_doc.exists or trip_doc.to_dict().get('user_id') != session['user_id']:
+            return "Unauthorized", 403
+            
+        trip_data = trip_doc.to_dict()
+        itinerary_data = trip_data['itinerary_content']
+        
+        # Generate PDF
+        pdf_buffer = generate_trip_pdf(itinerary_data)
+        
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=f"trip-{itinerary_data['request']['destination']}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        return f"Error generating PDF: {str(e)}", 500
+
+# Helper functions
+def generate_qr_code(url):
+    """Generate QR code for sharing URL."""
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    
+    # Convert to base64 for embedding in HTML
+    qr_code_data = base64.b64encode(buffer.getvalue()).decode()
+    return f"data:image/png;base64,{qr_code_data}"
+
+def get_user_display_name(user_id):
+    """Get user display name for attribution."""
+    try:
+        user = auth.get_user(user_id)
+        return user.display_name or user.email.split('@')[0]
+    except:
+        return "Anonymous Traveler"
+
+def generate_trip_pdf(itinerary_data):
+    """Generates a complete, multi-page PDF from the itinerary data."""
+    
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter # Get page dimensions
+
+    # --- Reusable Drawing Functions ---
+    def check_page_break(y_pos, needed_space=50):
+        """Creates a new page if there isn't enough space."""
+        if y_pos < needed_space:
+            p.showPage()
+            p.setFont("Helvetica", 9)
+            p.drawString(width - inch, 0.5 * inch, f"Page {p.getPageNumber()}")
+            return height - inch # Return new y_pos at the top
+        return y_pos
+
+    def draw_wrapped_text(text, x, y, max_width, font_name="Helvetica", font_size=10):
+        """Draws text that wraps automatically."""
+        p.setFont(font_name, font_size)
+        lines = []
+        # Basic word wrapping
+        for line in text.split('\n'):
+            words = line.split()
+            while len(words) > 0:
+                line_text = ""
+                while len(words) > 0 and p.stringWidth(line_text + words[0], font_name, font_size) < max_width:
+                    line_text += words.pop(0) + " "
+                lines.append(line_text)
+        
+        for line in lines:
+            p.drawString(x, y, line)
+            y -= font_size * 1.2
+        return y
+
+
+    # --- Start PDF Generation ---
+    y = height - inch # Start y-position
+    
+    # 1. Header Section
+    p.setFont("Helvetica-Bold", 24)
+    p.setFillColor(colors.HexColor('#2d6cdf'))
+    p.drawString(inch, y, f"Your Trip to {itinerary_data['request']['destination']}")
+    y -= 30
+    
+    p.setFont("Helvetica", 12)
+    p.setFillColor(colors.black)
+    p.drawString(inch, y, f"From: {itinerary_data['request']['source']}")
+    y -= 20
+    p.drawString(inch, y, f"Dates: {itinerary_data['request']['start_date']} to {itinerary_data['request']['return_date']}")
+    y -= 30
+    p.line(inch, y, width - inch, y) # Horizontal line
+    y -= 30
+    
+    # 2. Daily Plan Section
+    for day in itinerary_data['itinerary']['plan']:
+        y = check_page_break(y, needed_space=150) # Check if space for day header + 1 activity
+        
+        p.setFont("Helvetica-Bold", 16)
+        p.setFillColor(colors.HexColor('#1b4fa0'))
+        p.drawString(inch, y, f"Day {day['day']}: {day['theme']} ({day['date']})")
+        y -= 25
+
+        for activity in day['activities']:
+            y = check_page_break(y)
+            p.setFont("Helvetica-Bold", 11)
+            p.setFillColor(colors.black)
+            p.drawString(inch + 0.2*inch, y, f"{activity['time']}:")
+            
+            # Use wrapped text for description
+            y = draw_wrapped_text(f"{activity['description']} ({activity['location_name']})", 
+                                  inch + 1.2*inch, y, max_width=width - 2.5*inch)
+            y -= 10 # Extra space after each activity
+    
+        y -= 20 # Extra space after each day
+    
+    # 3. Cost Breakdown Section
+    y = check_page_break(y, needed_space=180)
+    p.line(inch, y, width - inch, y)
+    y -= 30
+    
+    p.setFont("Helvetica-Bold", 18)
+    p.setFillColor(colors.HexColor('#2d6cdf'))
+    p.drawString(inch, y, "Estimated Cost Breakdown")
+    y -= 30
+    
+    costs = itinerary_data['itinerary']['cost_breakdown']
+    p.setFont("Helvetica", 12)
+    p.setFillColor(colors.black)
+    
+    cost_items = [
+        ("Accommodation:", costs.get("accommodation_estimate_inr", 0)),
+        ("Transport:", costs.get("transport_estimate_inr", 0)),
+        ("Activities:", costs.get("activities_estimate_inr", 0)),
+        ("Food:", costs.get("food_estimate_inr", 0)),
+    ]
+    
+    for label, value in cost_items:
+        p.drawString(inch, y, label)
+        p.drawRightString(width - inch, y, f"₹{value:,}")
+        y -= 20
+
+    y -= 10
+    p.line(inch, y, width - inch, y)
+    y -= 20
+    
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(inch, y, "Total Estimated Cost:")
+    p.drawRightString(width - inch, y, f"₹{costs.get('total_estimate_inr', 0):,}")
+    
+    # --- Finalize PDF ---
+    p.save()
+    buffer.seek(0)
+    return buffer
+
+@app.route('/get-share-analytics-proxy', methods=['GET'])
+def get_share_analytics_proxy():
+    """
+    Proxy route to get share analytics (view counts, etc.) for the logged-in user.
+    """
+    if 'user_id' not in session:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({"status": "error", "message": "Missing Authorization header"}), 400
+
+        headers = {'Authorization': auth_header}
+        
+        # Use the NEW constant to call the manage-shares function with a GET request
+        response = requests.get(MANAGE_SHARES_FUNCTION_URL, headers=headers, timeout=20)
+        
+        response.raise_for_status() # Raise an error if the function fails
+        
+        return jsonify(response.json()), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Error fetching share analytics: {str(e)}"}), 500
+
+
+@app.route('/delete-share-link-proxy', methods=['POST'])
+def delete_share_link_proxy():
+    """
+    Proxy route to delete a specific public share link.
+    """
+    if 'user_id' not in session:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    
+    try:
+        auth_header = request.headers.get('Authorization')
+        data = request.get_json()
+        share_id = data.get('share_id')
+
+        if not all([auth_header, share_id]):
+            return jsonify({"status": "error", "message": "Missing authorization or share_id"}), 400
+
+        headers = {'Authorization': auth_header, 'Content-Type': 'application/json'}
+        
+        # Use the NEW constant to call the manage-shares function with a DELETE request
+        # Note: We use requests.delete() to match the method the Cloud Function expects
+        response = requests.delete(MANAGE_SHARES_FUNCTION_URL, json={"share_id": share_id}, headers=headers, timeout=15)
+        
+        response.raise_for_status()
+        
+        return jsonify(response.json()), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Error deleting share link: {str(e)}"}), 500
+
+def get_todays_weather(destination: str) -> dict:
+    """
+    Gets the CURRENT weather conditions using the Google Cloud Weather API,
+    following the official POST request documentation.
+    """
+
+     # --- ADD THIS DEBUG BLOCK ---
+    api_key = os.environ.get('GOOGLE_MAPS_API_KEY')
+    print(f"--- DEBUG: Attempting to use API Key ending in: ...{api_key[-4:]}")
+    # --- END OF DEBUG BLOCK ---
+
+
+    try:
+        geocode_result = gmaps.geocode(destination)
+        if not geocode_result:
+            return {"error": "Could not find location."}
+        
+        lat = geocode_result[0]['geometry']['location']['lat']
+        lng = geocode_result[0]['geometry']['location']['lng']
+    except Exception as e:
+        return {"error": f"Failed to get coordinates for {destination}: {e}"}
+
+    # --- FINAL CORRECTED API CALL matching the documentation EXACTLY ---
+    
+    # 1. The URL MUST end in ':lookup' and include the API key
+    endpoint = f"https://weather.googleapis.com/v1/currentConditions:lookup?key={os.environ.get('GOOGLE_MAPS_API_KEY')}"
+
+    # 2. The payload for the POST request contains ONLY the location
+    payload = {
+        "location": {
+            "latitude": lat,
+            "longitude": lng
+        }
+    }
+
+    try:
+        # 3. The method MUST be a POST request
+        response = requests.post(endpoint, json=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        current_conditions = data.get('currentConditions', {})
+        condition_text = current_conditions.get('condition', {}).get('text', 'Unknown')
+        temp_value = current_conditions.get('temperature', {}).get('value', 0)
+
+        weather_report = {
+            "condition": condition_text,
+            "description": f"Current condition is {condition_text.lower()}",
+            "temperature_celsius": temp_value
+        }
+        print(f"--- TOOL (Google Weather - Current Conditions): Forecast for {destination}: {weather_report} ---")
+        return weather_report
+    except requests.exceptions.HTTPError as e:
+        print(f"--- ERROR (Google Weather Tool): HTTP Error: {e.response.status_code} - {e.response.text} ---")
+        return {"error": f"Could not retrieve weather: {e.response.status_code}"}
+    except Exception as e:
+        print(f"--- ERROR (Google Weather Tool): A general error occurred: {e} ---")
+        return {"error": f"Could not retrieve weather: {e}"}
+
+
+@app.route('/adjust-for-weather', methods=['POST'])
+def adjust_for_weather():
+    """
+    Receives a day's plan and adjusts it based on real-time weather.
+    """
+    data = request.get_json()
+    original_activities = data.get('activities')
+    destination = data.get('destination')
+
+    # This prompt instructs the AI to use the weather tool and modify the plan
+    prompt = f"""
+    You are a smart travel assistant. Your task is to adjust a user's plan for today based on the current weather.
+
+    1.  **MUST call the `get_todays_weather` tool for the destination: {destination}.**
+    2.  Based on the weather condition (e.g., "Rain", "Clear", "Clouds") and temperature, review the following list of activities.
+    3.  If the weather is bad (e.g., "Rain", "Thunderstorm", "Extreme heat over 35°C"), you MUST replace outdoor activities with suitable indoor alternatives (e.g., museums, indoor markets, cinemas, malls, art galleries).
+    4.  If the weather is good, you can keep the existing activities or suggest even better outdoor options.
+    5.  Your final output MUST be only a valid JSON array of the adjusted activities, keeping the original structure. Do not add any conversational text.
+
+    Original activities for today:
+    {json.dumps(original_activities, indent=2)}
+    """
+
+    # Inside the adjust_for_weather function
+
+    # Find the try...except block in your adjust_for_weather function and replace it with this:
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # --- Your existing AI logic for adjustments ---
+            chat = model.start_chat()
+            response = chat.send_message(prompt)
+            
+            while True:
+                part = response.candidates[0].content.parts[0]
+                function_call = getattr(part, 'function_call', None)
+                if not function_call:
+                    break
+
+                if function_call.name == "get_todays_weather":
+                    weather_result = get_todays_weather(destination=destination)
+                    response = chat.send_message(
+                        Part.from_function_response(name="get_todays_weather", response=weather_result)
+                    )
+                else:
+                    break
+            
+            # --- Your existing parsing logic ---
+            raw_text = response.text.strip()
+            if "```json" in raw_text:
+                raw_text = raw_text.split("```json")[1].split("```")[0]
+            
+            json_start = raw_text.find('[')
+            json_end = raw_text.rfind(']') + 1
+            json_text = raw_text[json_start:json_end]
+
+            adjusted_activities = json.loads(json_text)
+            
+            return jsonify(adjusted_activities)
+
+        except ResourceExhausted as e:
+            # This handles the 429 error and tells the loop to retry
+            print(f"--- Weather Adjust Attempt {attempt + 1} failed: Resource Exhausted. Retrying... ---")
+            if attempt + 1 == max_retries:
+                return jsonify({"error": "AI service is busy (429). Please try again."}), 503
+            time.sleep(2)
+
+        except Exception as e:
+            # This handles any other error
+            print(f"Error during weather adjustment: {e}")
+            if attempt + 1 == max_retries:
+                return jsonify({"error": str(e)}), 500
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    app.run(
+        debug=False,
+        host='0.0.0.0',
+        port=int(os.environ.get('PORT', 8080))
+    )
