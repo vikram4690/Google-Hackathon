@@ -166,6 +166,9 @@
             <button id="saveTripBtn" style="margin-right: 1em;">
                 💾 Save Trip
             </button>
+            <button id="shareBtn" style="margin-right: 1em; display: none;">
+                🔗 Share Trip
+            </button>
             <button id="bookingBtn" style="padding: 1em 2em; background: linear-gradient(90deg, #28a745 60%, #218838 100%); 
                 color: white; border: none; border-radius: 12px; font-size: 1.1em; font-weight: 600; 
                 cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3); display: none;">
@@ -270,7 +273,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
         import { getAuth } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-    
+
         const firebaseConfig = {
             apiKey: "AIzaSyCLGw84oAfsi1hovFmFxedo6V_J-luj_Sg",
             authDomain: "principal-lane-470311-j4.firebaseapp.com",
@@ -279,77 +282,81 @@
             messagingSenderId: "215616135597",
             appId: "1:215616135597:web:99558a378db116fccdc124",
         };
-    
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const saveBtn = document.getElementById('saveTripBtn');
         const saveStatus = document.getElementById('saveStatus');
-    
+
         saveBtn.addEventListener('click', async () => {
             if (!auth.currentUser) {
                 alert('You must be logged in to save a trip.');
                 window.location.href = '/login';
                 return;
             }
-    
+
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
             saveStatus.textContent = '';
-    
+
             try {
                 const idToken = await auth.currentUser.getIdToken(true);
-                
-                // This line is now on a single line to prevent syntax errors
-                const itineraryData = {{ itinerary_data | tojson | safe }};
-    
-                const response = await fetch('/save-trip-proxy', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}`
-                    },
-                    body: JSON.stringify({
-                        source: itineraryData.request.source,
-                        destination: itineraryData.request.destination,
-                        itinerary_content: itineraryData
-                    })
-                });
-    
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to save the trip.');
-                }
-    
-                // --- NEW LOGIC TO ACTIVATE BOOKING BUTTON ---
-                
-                // Get the server's response which includes the new trip_id
-                const saveData = await response.json();
-                const tripId = saveData.data.trip_id; // Extract the ID
-    
-                // Update the UI to show the trip is saved
-                saveBtn.textContent = '✅ Saved!';
-                saveStatus.textContent = 'Trip saved! You can now proceed to booking.';
-    
-                // Find the booking button (which is hidden in the HTML)
-                const bookingBtn = document.getElementById('bookingBtn');
-                bookingBtn.style.display = 'inline-block'; // Make it visible
-    
-                // Set its click action to go to the correct URL with the new tripId
-                bookingBtn.onclick = function() {
-                    window.location.href = `/payment/${tripId}`;
-                };
-                
-                // --- END OF NEW LOGIC ---
+
+                const itineraryData = {{ itinerary_data | tojson | safe
+            }};
+
+        const response = await fetch('/save-trip-proxy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                source: itineraryData.request.source,
+                destination: itineraryData.request.destination,
+                itinerary_content: itineraryData
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to save the trip.');
+        }
+
+        // --- UPDATED LOGIC TO ACTIVATE BOTH SHARE AND BOOKING BUTTONS ---
+
+        const saveData = await response.json();
+        const tripId = saveData.data.trip_id;
+
+        // Update UI text
+        saveBtn.textContent = '✅ Saved!';
+        saveStatus.textContent = 'Trip saved! You can now share or book your trip.';
+
+        // Find and activate the NEW SHARE button
+        const shareBtn = document.getElementById('shareBtn');
+        shareBtn.style.display = 'inline-block';
+        shareBtn.onclick = function () {
+            window.location.href = `/share-trip/${tripId}`;
+        };
+
+        // Find and activate the existing booking button
+        const bookingBtn = document.getElementById('bookingBtn');
+        bookingBtn.style.display = 'inline-block';
+        bookingBtn.onclick = function () {
+            window.location.href = `/payment/${tripId}`;
+        };
+
+                // --- END OF UPDATED LOGIC ---
     
             } catch (error) {
-                console.error('Save trip error:', error);
-                saveStatus.textContent = `Error: ${error.message}`;
-                saveBtn.disabled = false;
-                saveBtn.textContent = '💾 Save Trip';
-            }
+            console.error('Save trip error:', error);
+            saveStatus.textContent = `Error: ${error.message}`;
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save Trip';
+        }
         });
     </script>
-
+    
 
 </body>
 

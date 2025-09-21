@@ -5,3 +5,4 @@ googlemaps
 firebase-admin
 google-cloud-bigquery
 gunicorn
+python-dotenv
