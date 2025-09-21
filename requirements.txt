@@ -6,3 +6,5 @@ firebase-admin
 google-cloud-bigquery
 gunicorn
 python-dotenv
+qrcode[pil]
+reportlab

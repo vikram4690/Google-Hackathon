@@ -221,6 +221,44 @@
                 width: 100%;
             }
         }
+
+        /* Flash message styles */
+        .flash-container {
+            margin-bottom: 1.5em;
+        }
+
+        .alert {
+            padding: 1em;
+            border-radius: 8px;
+            margin-bottom: 1em;
+            position: relative;
+        }
+
+        .alert-error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #ef5350;
+        }
+
+        .alert-success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #66bb6a;
+        }
+
+        .alert-info {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #42a5f5;
+        }
+
+        .close-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -229,6 +267,19 @@
         <div class="header">
             <img src="https://img.icons8.com/color/96/india.png" alt="India Icon">
             <h1>AI Trip Planner for India</h1>
+        </div>
+        <!-- Flash messages section -->
+        <div id="flash-messages" class="flash-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+                <span class="close-btn" onclick="this.parentElement.style.display='none';">&times;</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
         </div>
         <div id="authSection" style="text-align: center; margin-bottom: 1.5em;">
             <!-- Authentication content will be dynamically loaded here -->
