@@ -171,7 +171,7 @@ try:
     print("--- DEBUG: About to INITIALIZE the model... ---")
     
     # THIS IS THE CRUCIAL LINE THAT CREATES THE 'model' VARIABLE
-    model = GenerativeModel("gemini-1.5-flash-002", tools=[combined_tool])
+    model = GenerativeModel("gemini-2.5-flash", tools=[combined_tool])
     
     # This line initializes the Google Maps client
     gmaps = googlemaps.Client(key=os.environ.get('GOOGLE_MAPS_API_KEY'))
