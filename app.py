@@ -27,11 +27,22 @@ from google.api_core.exceptions import ResourceExhausted
 
 
 load_dotenv()
+
 # --- Initialization ---
 app = Flask(__name__, template_folder='templates')
-app.secret_key = 'your-very-secret-key-for-hackathon'
+
+# Security: Use environment variable for secret key with fallback
+SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('FLASK_ENV') == 'production':
+        raise ValueError("FLASK_SECRET_KEY environment variable must be set in production")
+    # Only use fallback in development
+    SECRET_KEY = 'dev-secret-key-change-in-production'
+    print("WARNING: Using development secret key. Set FLASK_SECRET_KEY in production!")
+
+app.secret_key = SECRET_KEY
+app.config['SECRET_KEY'] = SECRET_KEY
 CORS(app)
-app.config['SECRET_KEY'] = 'your-super-secret-key-change-this'
 
 SAVE_TRIP_FUNCTION_URL = "https://asia-south1-principal-lane-470311-j4.cloudfunctions.net/save-trip"
 GET_TRIPS_FUNCTION_URL = "https://asia-south1-principal-lane-470311-j4.cloudfunctions.net/get-trips"
@@ -47,8 +58,26 @@ firebase_admin.initialize_app(cred)
 # --- Configuration ---
 VERTEX_PROJECT = os.environ.get('GOOGLE_PROJECT_ID')
 VERTEX_LOCATION = 'asia-south1'
-if not VERTEX_PROJECT:
-    raise ValueError("Missing GOOGLE_PROJECT_ID environment variable.")
+
+# Validate required environment variables
+required_env_vars = {
+    'GOOGLE_PROJECT_ID': VERTEX_PROJECT,
+    'GOOGLE_MAPS_API_KEY': os.environ.get('GOOGLE_MAPS_API_KEY')
+}
+
+missing_vars = [var for var, value in required_env_vars.items() if not value]
+if missing_vars:
+    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+# Optional environment variables with warnings
+optional_env_vars = {
+    'RAPIDAPI_KEY': 'Hotel pricing will use default values',
+    'OPENWEATHER_API_KEY': 'Weather features will be disabled'
+}
+
+for var, warning in optional_env_vars.items():
+    if not os.environ.get(var):
+        print(f"WARNING: {var} not set. {warning}")
 
 
 # --- Define the tool for Gemini ---
@@ -56,10 +85,16 @@ def get_average_hotel_price(destination: str) -> float:
     """
     Gets the average hotel price for a destination by calling the Booking.com API.
     This is a two-step process: first get the destination ID, then search for hotels.
+    
+    Args:
+        destination (str): The city name to search for
+        
+    Returns:
+        float: Average hotel price in INR, defaults to 3500.0 if API fails
     """
     api_key = os.getenv('RAPIDAPI_KEY')
     if not api_key:
-        print("--- ERROR: RAPIDAPI_KEY not found. Returning default price. ---")
+        print("INFO: RAPIDAPI_KEY not found. Using default hotel price.")
         return 3500.0
 
     headers = {
@@ -69,7 +104,6 @@ def get_average_hotel_price(destination: str) -> float:
     
 
     # --- Step 1: Get the Destination ID from the city name ---
-    print(f"--- TOOL (Step 1): Getting Destination ID for {destination} ---")
     locations_url = "https://booking-com.p.rapidapi.com/v1/hotels/locations"
     locations_querystring = {"name": destination, "locale": "en-gb"}
     dest_id = None
@@ -82,14 +116,13 @@ def get_average_hotel_price(destination: str) -> float:
                 dest_id = loc.get('dest_id')
                 break
         if not dest_id:
-            print(f"--- WARN: Could not find a destination ID for {destination}. ---")
+            print(f"WARNING: Could not find destination ID for {destination}")
             return 3500.0
     except requests.exceptions.RequestException as e:
-        print(f"--- ERROR (Step 1): API call to get destination ID failed: {e}. ---")
+        print(f"ERROR: Failed to get destination ID: {e}")
         return 3500.0
 
     # --- Step 2: Use the ID to search for hotels ---
-    print(f"--- TOOL (Step 2): Searching hotels with ID {dest_id} for {destination} ---")
     search_url = "https://booking-com.p.rapidapi.com/v2/hotels/search"
     today = date.today()
     checkin_date = today + timedelta(days=60)
@@ -107,15 +140,14 @@ def get_average_hotel_price(destination: str) -> float:
         
         hotels = data.get('results', [])
         if not hotels:
-            print(f"--- WARN: No hotels found by API for {destination}. ---")
+            print(f"WARNING: No hotels found for {destination}")
             return 3500.0
 
         prices = []
-        # --- THIS IS THE FINAL, CORRECTED EXTRACTION LOGIC ---
+        # Extract hotel prices from API response
         for hotel in hotels[:5]: 
             price_breakdown = hotel.get('priceBreakdown')
             if price_breakdown:
-                # Note the casing: 'grossPrice'
                 gross_price_obj = price_breakdown.get('grossPrice') 
                 if gross_price_obj:
                     price_value = gross_price_obj.get('value')
@@ -123,15 +155,15 @@ def get_average_hotel_price(destination: str) -> float:
                         prices.append(float(price_value))
         
         if not prices:
-            print(f"--- WARN: Hotels found, but price values were still not extracted. Check API response structure. ---")
+            print(f"WARNING: Could not extract prices for {destination}")
             return 3500.0
 
         average_price = sum(prices) / len(prices)
-        print(f"--- TOOL RESULT: Average price for {destination} is ₹{average_price:.2f} ---")
+        print(f"INFO: Average hotel price for {destination}: ₹{average_price:.2f}")
         return average_price
 
     except requests.exceptions.RequestException as e:
-        print(f"--- ERROR (Step 2): API call to search hotels failed: {e}. ---")
+        print(f"ERROR: Failed to search hotels: {e}")
         return 3500.0
 
 get_average_hotel_price_func = FunctionDeclaration(
@@ -162,22 +194,19 @@ combined_tool = Tool(
     ],
 )
 
-print("--- DEBUG: hotel_pricing_tool has been DEFINED. ---")
-
 # --- Client Initialization ---
 try:
     vertexai.init(project=VERTEX_PROJECT, location=VERTEX_LOCATION)
-
-    print("--- DEBUG: About to INITIALIZE the model... ---")
     
-    # THIS IS THE CRUCIAL LINE THAT CREATES THE 'model' VARIABLE
+    # Initialize the Gemini model with tools
     model = GenerativeModel("gemini-2.5-flash", tools=[combined_tool])
     
-    # This line initializes the Google Maps client
+    # Initialize Google Maps client
     gmaps = googlemaps.Client(key=os.environ.get('GOOGLE_MAPS_API_KEY'))
+    
+    print("INFO: Successfully initialized Vertex AI and Google Maps clients")
 
 except Exception as e:
-    # If any of the above lines fail, the app will crash on startup, which is good for debugging.
     raise RuntimeError(f"Failed to initialize clients: {e}")
 
 # --- ROUTES ---
@@ -306,35 +335,40 @@ def plan_trip():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # --- START of the main try block ---
+            # Initialize chat session
             chat = model.start_chat(response_validation=False)
             response = chat.send_message(prompt)
 
-            # --- The safe while loop for tool calls ---
-            while True:
+            # Handle function calls from AI with safety limit
+            tool_call_count = 0
+            max_tool_calls = 5  # Prevent infinite loops
+            
+            while tool_call_count < max_tool_calls:
                 part = response.candidates[0].content.parts[0]
                 function_call = getattr(part, 'function_call', None)
 
                 if not function_call:
                     break # Exit loop if AI is done calling tools
 
+                tool_call_count += 1
+
                 if function_call.name == "get_average_hotel_price":
-                    # ... your hotel tool logic ...
                     price_result = get_average_hotel_price(destination=function_call.args['destination'])
                     response = chat.send_message(Part.from_function_response(name="get_average_hotel_price", response={"price": price_result}))
 
                 elif function_call.name == "get_todays_weather":
-                    # ... your weather tool logic ...
                     weather_result = get_todays_weather(destination=function_call.args['destination'])
                     response = chat.send_message(Part.from_function_response(name="get_todays_weather", response=weather_result))
                 
                 else:
+                    print(f"WARNING: Unknown function call: {function_call.name}")
                     break # Unknown tool, exit loop
             
-            # --- PARSING LOGIC IS NOW BACK INSIDE THE SAME TRY BLOCK ---
-            raw_text = response.text
+            if tool_call_count >= max_tool_calls:
+                print("WARNING: Maximum tool calls reached, proceeding with current response")
             
-            print("=== AI RESPONSE DEBUG (after all tool use) ===")
+            # Parse AI response
+            raw_text = response.text
             
             cleaned_text = raw_text.strip()
             if "```json" in cleaned_text:
@@ -358,28 +392,24 @@ def plan_trip():
             return redirect(url_for('show_itinerary'))
 
         except ResourceExhausted as e:
-            print(f"--- Attempt {attempt + 1} failed: Resource Exhausted. Retrying... ---")
+            print(f"Attempt {attempt + 1} failed: Rate limit exceeded. Retrying...")
             if attempt + 1 == max_retries:
-            # Store the error in session for the template to display
-                flash("Oops! Our AI travel planner is a bit overloaded right now. Please try again in a minute or two.", "error")
+                flash("Our AI service is currently busy. Please try again in a few minutes.", "error")
                 return redirect(url_for('index'))
             time.sleep(2)
         
         except Exception as e:
             error_message = str(e)
-            print(f"An error occurred during trip planning or parsing: {error_message}")
+            print(f"Trip planning error: {error_message}")
             
             if "Malformed function call" in error_message:
-                # Handle this specific error case
-                flash("Our AI travel planner is having trouble creating your itinerary. Please try again with different dates or destination.", "error")
+                flash("Unable to create itinerary with current parameters. Please try different dates or destination.", "error")
                 return redirect(url_for('index'))
             elif "Resource Exhausted" in error_message or "429" in error_message:
-                # Handle rate limit errors
-                flash("Oops! Our AI travel planner is a bit overloaded right now. Please try again in a minute or two.", "error")
+                flash("Our AI service is currently busy. Please try again in a few minutes.", "error")
                 return redirect(url_for('index'))
             else:
-                # Generic error
-                flash(f"Something went wrong while creating your itinerary. Please try again.", "error")
+                flash("An error occurred while creating your itinerary. Please try again.", "error")
                 return redirect(url_for('index'))
 
 @app.route('/regenerate', methods=['POST'])
@@ -963,11 +993,16 @@ def delete_share_link_proxy():
 def get_todays_weather(destination: str) -> dict:
     """
     Gets the current weather forecast for a specific city using the OpenWeatherMap API.
+    
+    Args:
+        destination (str): The city name to get weather for
+        
+    Returns:
+        dict: Weather information or error message
     """
     api_key = os.getenv('OPENWEATHER_API_KEY')
-    print(f"--- DEBUG: OpenWeather API Key being used: {api_key}")
     if not api_key:
-        print("--- ERROR (OpenWeather Tool): OPENWEATHER_API_KEY not found in .env file. ---")
+        print("WARNING: OPENWEATHER_API_KEY not found. Weather features disabled.")
         return {"error": "Weather service is not configured."}
     
     # Construct the API URL
@@ -977,8 +1012,6 @@ def get_todays_weather(destination: str) -> dict:
         "appid": api_key,
         "units": "metric"  # For temperature in Celsius
     }
-    
-    print(f"--- TOOL (OpenWeather): Getting weather for {destination} ---")
     
     try:
         response = requests.get(url, params=params, timeout=10)
@@ -996,14 +1029,14 @@ def get_todays_weather(destination: str) -> dict:
             "temperature_celsius": temp_celsius
         }
         
-        print(f"--- TOOL (OpenWeather): Forecast for {destination}: {weather_report} ---")
+        print(f"INFO: Weather for {destination}: {weather_report}")
         return weather_report
         
     except requests.exceptions.HTTPError as e:
-        print(f"--- ERROR (OpenWeather Tool): HTTP Error: {e.response.status_code} - {e.response.text} ---")
+        print(f"ERROR: Weather API HTTP Error: {e.response.status_code}")
         return {"error": f"Could not retrieve weather: {e.response.status_code}"}
     except Exception as e:
-        print(f"--- ERROR (OpenWeather Tool): A general error occurred: {e} ---")
+        print(f"ERROR: Weather API Error: {e}")
         return {"error": f"Could not retrieve weather: {e}"}
 
 
@@ -1037,15 +1070,21 @@ def adjust_for_weather():
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # --- Your existing AI logic for adjustments ---
+            # Initialize chat session
             chat = model.start_chat(response_validation=False)
             response = chat.send_message(prompt)
             
-            while True:
+            # Handle function calls from AI with safety limit
+            tool_call_count = 0
+            max_tool_calls = 5  # Prevent infinite loops
+            
+            while tool_call_count < max_tool_calls:
                 part = response.candidates[0].content.parts[0]
                 function_call = getattr(part, 'function_call', None)
                 if not function_call:
                     break
+
+                tool_call_count += 1
 
                 if function_call.name == "get_todays_weather":
                     weather_result = get_todays_weather(destination=destination)
@@ -1053,9 +1092,13 @@ def adjust_for_weather():
                         Part.from_function_response(name="get_todays_weather", response=weather_result)
                     )
                 else:
+                    print(f"WARNING: Unknown function call: {function_call.name}")
                     break
             
-            # --- Your existing parsing logic ---
+            if tool_call_count >= max_tool_calls:
+                print("WARNING: Maximum tool calls reached")
+            
+            # Parse AI response
             raw_text = response.text.strip()
             if "```json" in raw_text:
                 raw_text = raw_text.split("```json")[1].split("```")[0]
